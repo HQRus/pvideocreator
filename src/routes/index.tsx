@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   ArrowUp,
@@ -78,9 +78,12 @@ function Index() {
         </nav>
         <div className="flex items-center gap-3">
           <button className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline">Sign in</button>
-          <button className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-90">
-            Start creating
-          </button>
+          <Link
+            to="/studio"
+            className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-90"
+          >
+            Open studio
+          </Link>
         </div>
       </header>
 
@@ -127,11 +130,14 @@ function Index() {
                   9:16
                 </button>
               </div>
-              <button className="group/btn inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-95">
+              <Link
+                to="/studio"
+                className="group/btn inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-95"
+              >
                 <Wand2 className="h-4 w-4" />
                 Generate
                 <ArrowUp className="h-4 w-4 transition group-hover/btn:-translate-y-0.5" />
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -261,9 +267,12 @@ function Index() {
           <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
             Start free. Render up to 60 seconds. Upgrade when you're ready to ship the full feature.
           </p>
-          <button className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-95 animate-pulse-glow">
+          <Link
+            to="/studio"
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-95 animate-pulse-glow"
+          >
             <Wand2 className="h-4 w-4" /> Create your first reel
-          </button>
+          </Link>
         </div>
       </section>
 
