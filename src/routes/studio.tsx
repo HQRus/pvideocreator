@@ -99,7 +99,7 @@ function Studio() {
     <div className="flex h-screen flex-col bg-background text-foreground">
       <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
       <div className="flex-1 overflow-hidden border-t border-border/60">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanelGroup orientation="horizontal" className="h-full">
           <ResizablePanel defaultSize={26} minSize={20} className="bg-sidebar/40">
             <ChatPanel />
           </ResizablePanel>
