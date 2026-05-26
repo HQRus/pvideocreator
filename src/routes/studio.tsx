@@ -31,11 +31,7 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message";
+import { Message } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputTextarea,
@@ -45,6 +41,12 @@ import {
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { ReelableMark } from "@/components/reelable-mark";
 import { Button } from "@/components/ui/button";
+import {
+  GenerativeCard,
+  DecisionPill,
+  UserBubble,
+  extractCardTitle,
+} from "@/components/studio/generative-card";
 import sample1 from "@/assets/sample-1.jpg";
 import sample2 from "@/assets/sample-2.jpg";
 import sample3 from "@/assets/sample-3.jpg";
@@ -168,10 +170,10 @@ function formatDuration(seconds: number) {
 // ---------- chat panel ----------
 
 const STARTERS = [
-  "Break this into a 5-scene music video.",
-  "Make scene 3 more cinematic — add slow motion.",
-  "Suggest a synthwave track that fits the mood.",
-  "Add a character: a mysterious passenger.",
+  "Music video",
+  "30-second product ad",
+  "Short drama, 2 minutes",
+  "TikTok hook — fashion",
 ];
 
 function ChatPanel() {
@@ -188,6 +190,43 @@ function ChatPanel() {
     setInput("");
     await sendMessage({ text: trimmed });
   };
+
+  // Pair assistant cards with the user message that answered them.
+  // Render the last assistant card as interactive; older ones collapse to pills.
+  const textOf = (m: UIMessage) =>
+    m.parts
+      .map((p) => (p.type === "text" ? p.text : ""))
+      .join("")
+      .trim();
+
+  const items: Array<
+    | { kind: "user"; key: string; text: string }
+    | { kind: "pill"; key: string; title: string; answer: string }
+    | { kind: "card"; key: string; html: string }
+  > = [];
+
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (m.role === "user") {
+      const prev = messages[i - 1];
+      if (!prev || prev.role === "user") {
+        items.push({ kind: "user", key: m.id, text: textOf(m) });
+      }
+      continue;
+    }
+    const html = textOf(m);
+    const next = messages[i + 1];
+    if (next && next.role === "user") {
+      items.push({
+        kind: "pill",
+        key: m.id,
+        title: extractCardTitle(html),
+        answer: textOf(next),
+      });
+    } else {
+      items.push({ kind: "card", key: m.id, html });
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -209,8 +248,8 @@ function ChatPanel() {
             <ConversationEmptyState
               className="px-2"
               icon={<ReelableMark className="h-10 w-10" />}
-              title="Direct your reel"
-              description="Describe a scene, request a rewrite, or ask for a full breakdown. I'll update the storyboard on the right."
+              title="What are we making?"
+              description="Type anything — even one word. I'll generate the next step as something you can click."
             >
               <div className="mt-4 flex w-full flex-col gap-1.5">
                 {STARTERS.map((s) => (
@@ -225,30 +264,35 @@ function ChatPanel() {
               </div>
             </ConversationEmptyState>
           ) : (
-            messages.map((m: UIMessage) => (
-              <Message key={m.id} from={m.role === "user" ? "user" : "assistant"}>
-                {m.role === "assistant" ? (
-                  <div className="w-full">
-                    {m.parts.map((p, i) => {
-                      if (p.type === "text") {
-                        return <MessageResponse key={i}>{p.text}</MessageResponse>;
-                      }
-                      return null;
-                    })}
-                  </div>
-                ) : (
-                  <MessageContent>
-                    {m.parts.map((p, i) =>
-                      p.type === "text" ? <span key={i}>{p.text}</span> : null,
-                    )}
-                  </MessageContent>
-                )}
-              </Message>
-            ))
+            items.map((it) => {
+              if (it.kind === "user") {
+                return <UserBubble key={it.key} text={it.text} />;
+              }
+              if (it.kind === "pill") {
+                return (
+                  <DecisionPill key={it.key} title={it.title} answer={it.answer} />
+                );
+              }
+              // active card — hide while streaming, show shimmer instead
+              if (status === "streaming") {
+                return (
+                  <Message key={it.key} from="assistant">
+                    <Shimmer>Designing the next step…</Shimmer>
+                  </Message>
+                );
+              }
+              return (
+                <GenerativeCard
+                  key={it.key}
+                  html={it.html}
+                  onAnswer={handleSend}
+                />
+              );
+            })
           )}
           {status === "submitted" && (
             <Message from="assistant">
-              <Shimmer>Thinking through the scene…</Shimmer>
+              <Shimmer>Designing the next step…</Shimmer>
             </Message>
           )}
           {error && (
@@ -270,7 +314,7 @@ function ChatPanel() {
             autoFocus
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Describe a scene, refine a shot, change the mood…"
+            placeholder="Type freely, or just click the card above…"
           />
           <PromptInputFooter className="justify-end">
             <PromptInputSubmit status={status} disabled={busy && !input} />
