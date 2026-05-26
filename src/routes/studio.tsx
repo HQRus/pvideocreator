@@ -8,6 +8,7 @@ import {
   Download,
   Share2,
   Film,
+  LayoutGrid,
   Users,
   Music2,
   Clock,
@@ -102,25 +103,17 @@ function Studio() {
       <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
       <div className="flex-1 overflow-hidden border-t border-border/60">
         <ResizablePanelGroup orientation="horizontal" className="h-full">
-          <ResizablePanel defaultSize={26} minSize={20} className="bg-sidebar/40">
+          <ResizablePanel defaultSize={42} minSize={28} className="bg-sidebar/40">
             <ChatPanel />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={48} minSize={30}>
-            <PreviewPanel
-              scenes={scenes}
-              activeSceneId={activeSceneId}
-              onSelect={setActiveSceneId}
-              totalDuration={totalDuration}
-            />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={26} minSize={22} className="bg-sidebar/40">
+          <ResizablePanel defaultSize={58} minSize={40}>
             <StructurePanel
               scenes={scenes}
               setScenes={setScenes}
               activeSceneId={activeSceneId}
               onSelect={setActiveSceneId}
+              totalDuration={totalDuration}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -489,20 +482,25 @@ function StructurePanel({
   setScenes,
   activeSceneId,
   onSelect,
+  totalDuration,
 }: {
   scenes: Scene[];
   setScenes: (s: Scene[]) => void;
   activeSceneId: string;
   onSelect: (id: string) => void;
+  totalDuration: number;
 }) {
   return (
     <div className="flex h-full flex-col">
-      <Tabs defaultValue="scenes" className="flex h-full flex-col">
+      <Tabs defaultValue="storyboard" className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-2.5">
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Project
           </span>
           <TabsList className="h-7 bg-muted/60">
+            <TabsTrigger value="storyboard" className="h-6 gap-1 px-2 text-xs">
+              <LayoutGrid className="h-3 w-3" /> Storyboard
+            </TabsTrigger>
             <TabsTrigger value="scenes" className="h-6 gap-1 px-2 text-xs">
               <Film className="h-3 w-3" /> Scenes
             </TabsTrigger>
@@ -514,6 +512,15 @@ function StructurePanel({
             </TabsTrigger>
           </TabsList>
         </div>
+
+        <TabsContent value="storyboard" className="m-0 flex-1 overflow-hidden">
+          <PreviewPanel
+            scenes={scenes}
+            activeSceneId={activeSceneId}
+            onSelect={onSelect}
+            totalDuration={totalDuration}
+          />
+        </TabsContent>
 
         <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto p-3">
           <div className="space-y-2">
