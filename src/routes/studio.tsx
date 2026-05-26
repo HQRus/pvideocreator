@@ -8,6 +8,7 @@ import {
   Download,
   Share2,
   Film,
+  LayoutGrid,
   Users,
   Music2,
   Clock,
@@ -102,25 +103,17 @@ function Studio() {
       <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
       <div className="flex-1 overflow-hidden border-t border-border/60">
         <ResizablePanelGroup orientation="horizontal" className="h-full">
-          <ResizablePanel defaultSize={26} minSize={20} className="bg-sidebar/40">
+          <ResizablePanel defaultSize={42} minSize={28} className="bg-sidebar/40">
             <ChatPanel />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={48} minSize={30}>
-            <PreviewPanel
-              scenes={scenes}
-              activeSceneId={activeSceneId}
-              onSelect={setActiveSceneId}
-              totalDuration={totalDuration}
-            />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={26} minSize={22} className="bg-sidebar/40">
+          <ResizablePanel defaultSize={58} minSize={40}>
             <StructurePanel
               scenes={scenes}
               setScenes={setScenes}
               activeSceneId={activeSceneId}
               onSelect={setActiveSceneId}
+              totalDuration={totalDuration}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
