@@ -640,6 +640,7 @@ function StatusDot({ status }: { status: Scene["status"] }) {
 // ---------- structure panel ----------
 
 function StructurePanel({
+  meta,
   scenes,
   setScenes,
   cast,
@@ -648,6 +649,7 @@ function StructurePanel({
   onSelect,
   totalDuration,
 }: {
+  meta: { title: string; format: string; aspectRatio: string; logline: string };
   scenes: Scene[];
   setScenes: (s: Scene[]) => void;
   cast: Character[];
@@ -659,7 +661,20 @@ function StructurePanel({
   return (
     <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
-        <div className="border-b-2 border-border/40 px-8 pt-8 pb-0">
+        <div className="px-8 pt-8">
+          <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+            {meta.format && meta.format !== "—" ? meta.format : "New project"}
+            {meta.aspectRatio && meta.aspectRatio !== "—" ? ` · ${meta.aspectRatio}` : ""}
+          </div>
+          <h2 className="mt-2 font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground">
+            {meta.title}
+          </h2>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+            {meta.logline ||
+              "Your video's overview will appear here and evolve as you make decisions in the chat."}
+          </p>
+        </div>
+        <div className="mt-6 border-b-2 border-border/40 px-8 pb-0">
           <TabsList className="h-auto w-full justify-start gap-8 rounded-none bg-transparent p-0">
             {[
               { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
