@@ -109,7 +109,7 @@ export function DecisionPill({
   answer: string;
 }) {
   return (
-    <div className="ml-auto flex max-w-[80%] flex-col gap-1.5 self-end rounded-3xl bg-secondary px-5 py-3.5 text-foreground shadow-elegant">
+    <div className="ml-auto flex max-w-[80%] animate-fade-in flex-col gap-1.5 self-end rounded-3xl bg-secondary px-5 py-3.5 text-foreground shadow-elegant">
       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </span>
@@ -120,7 +120,7 @@ export function DecisionPill({
 
 export function UserBubble({ text }: { text: string }) {
   return (
-    <div className="ml-auto max-w-[80%] rounded-3xl bg-secondary px-5 py-3.5 text-base leading-snug text-foreground shadow-elegant">
+    <div className="ml-auto max-w-[80%] animate-fade-in rounded-3xl bg-secondary px-5 py-3.5 text-base leading-snug text-foreground shadow-elegant">
       {text}
     </div>
   );
@@ -128,7 +128,7 @@ export function UserBubble({ text }: { text: string }) {
 
 export function AssistantMessage({ text }: { text: string }) {
   return (
-    <div className="max-w-[85%] self-start font-display text-2xl leading-snug tracking-tight text-foreground">
+    <div className="max-w-[85%] animate-fade-in self-start font-display text-2xl leading-snug tracking-tight text-foreground">
       {text}
     </div>
   );

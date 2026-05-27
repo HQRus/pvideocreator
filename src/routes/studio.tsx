@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Play,
   Pause,
@@ -327,6 +327,11 @@ function ChatPanel() {
     }
   }
 
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, activeCard?.key, busy]);
+
   return (
     <div className="flex h-full flex-col">
       <Conversation className="flex-1">
@@ -359,6 +364,7 @@ function ChatPanel() {
               {error.message ?? "Something went wrong with the AI gateway."}
             </div>
           )}
+          <div ref={bottomRef} className="h-4" />
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
