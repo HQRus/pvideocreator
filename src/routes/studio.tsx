@@ -255,11 +255,11 @@ function StudioTopBar({
       >
         <ChevronLeft className="h-4 w-4" />
       </Link>
-      <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-card px-5 py-2 shadow-elegant">
-        <ReelableMark className="h-6 w-6" />
-        <div className="flex items-baseline gap-2 leading-tight">
-          <span className="text-sm font-semibold tracking-tight">{meta.title}</span>
-          <span className="text-[11px] text-muted-foreground">
+      <div className="pointer-events-auto flex items-center gap-3.5 rounded-full bg-foreground px-6 py-2.5 shadow-elegant">
+        <ReelableMark className="h-7 w-7" />
+        <div className="flex items-baseline gap-2.5 leading-tight">
+          <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
+          <span className="text-xs text-background/60">
             {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
           </span>
         </div>
