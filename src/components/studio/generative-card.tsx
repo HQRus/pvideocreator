@@ -40,6 +40,29 @@ export function stripCardWrapper(html: string): string {
   return html;
 }
 
+// Extract a hidden JSON project patch the model embeds in its reply.
+// Shape:
+//   <script type="application/json" data-project-patch>{ ... }</script>
+// We always strip these out of the HTML before sanitizing/rendering.
+export function extractProjectPatch(html: string): unknown | null {
+  const m = html.match(
+    /<script[^>]*data-project-patch[^>]*>([\s\S]*?)<\/script>/i,
+  );
+  if (!m) return null;
+  try {
+    return JSON.parse(m[1].trim());
+  } catch {
+    return null;
+  }
+}
+
+export function stripProjectPatch(html: string): string {
+  return html.replace(
+    /<script[^>]*data-project-patch[^>]*>[\s\S]*?<\/script>/gi,
+    "",
+  );
+}
+
 export function GenerativeCard({
   html,
   onAnswer,
@@ -50,7 +73,7 @@ export function GenerativeCard({
   disabled?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const cleaned = stripCardProse(stripCardWrapper(html));
+  const cleaned = stripProjectPatch(stripCardProse(stripCardWrapper(html)));
   const safe = DOMPurify.sanitize(cleaned, SANITIZE_CONFIG);
 
   useEffect(() => {
