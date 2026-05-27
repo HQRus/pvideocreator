@@ -284,119 +284,69 @@ function ChatPanel() {
     await sendMessage({ text: trimmed });
   };
 
-  // Pair assistant cards with the user message that answered them.
-  // Render the last assistant card as interactive; older ones collapse to pills.
   const textOf = (m: UIMessage) =>
     m.parts
       .map((p) => (p.type === "text" ? p.text : ""))
       .join("")
       .trim();
 
-  const items: Array<
+  // History items = everything that's "decided". The most recent assistant
+  // card (if not yet answered) is the *active* card, rendered anchored
+  // above the input — NOT inside the scroll history.
+  const history: Array<
     | { kind: "user"; key: string; text: string }
     | { kind: "pill"; key: string; title: string; answer: string }
-    | { kind: "card"; key: string; html: string }
   > = [];
+  let activeCard: { key: string; html: string } | null = null;
 
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i];
     if (m.role === "user") {
       const prev = messages[i - 1];
       if (!prev || prev.role === "user") {
-        items.push({ kind: "user", key: m.id, text: textOf(m) });
+        history.push({ kind: "user", key: m.id, text: textOf(m) });
       }
       continue;
     }
     const html = textOf(m);
     const next = messages[i + 1];
     if (next && next.role === "user") {
-      items.push({
+      history.push({
         kind: "pill",
         key: m.id,
         title: extractCardTitle(html),
         answer: textOf(next),
       });
     } else {
-      items.push({ kind: "card", key: m.id, html });
+      activeCard = { key: m.id, html };
     }
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-3">
-          <span className="font-display text-lg tracking-tight">Director</span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            AI · live
-          </span>
-        </div>
-        <Button variant="ghost" size="icon-sm">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </div>
-
       <Conversation className="flex-1">
-        <ConversationContent className="gap-6 px-6 py-8">
-          {messages.length === 0 ? (
-            <ConversationEmptyState
-              className="gap-6 px-4 py-12"
-              icon={<ReelableMark className="h-14 w-14" />}
-              title="What are we making?"
-              description="Type one word. I'll do the rest."
-            >
-              <ReelableMark className="h-16 w-16" />
-              <h3 className="font-display text-3xl tracking-tight">
+        <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
+          {history.length === 0 && !activeCard ? (
+            <div className="flex h-full flex-col items-center justify-center gap-8 py-16 text-center">
+              <ReelableMark className="h-20 w-20" />
+              <h1 className="font-display text-5xl tracking-tight">
                 What are we making?
-              </h3>
-              <p className="text-base text-muted-foreground">
-                Type one word. I'll do the rest.
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Type one word below. I'll take it from there.
               </p>
-              <div className="mt-6 flex w-full flex-col gap-2.5">
-                {STARTERS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleSend(s)}
-                    className="rounded-2xl border border-border bg-card px-5 py-4 text-left text-base font-medium text-foreground shadow-elegant transition hover:border-primary/50 hover:shadow-glow"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </ConversationEmptyState>
+            </div>
           ) : (
-            items.map((it) => {
-              if (it.kind === "user") {
-                return <UserBubble key={it.key} text={it.text} />;
-              }
-              if (it.kind === "pill") {
-                return (
-                  <DecisionPill key={it.key} title={it.title} answer={it.answer} />
-                );
-              }
-              // active card — hide while streaming, show shimmer instead
-              if (status === "streaming") {
-                return (
-                  <Message key={it.key} from="assistant">
-                    <Shimmer>Designing the next step…</Shimmer>
-                  </Message>
-                );
-              }
-              return (
-                <GenerativeCard
-                  key={it.key}
-                  html={it.html}
-                  onAnswer={handleSend}
-                />
-              );
-            })
-          )}
-          {status === "submitted" && (
-            <Message from="assistant">
-              <Shimmer>Designing the next step…</Shimmer>
-            </Message>
+            history.map((it) =>
+              it.kind === "user" ? (
+                <UserBubble key={it.key} text={it.text} />
+              ) : (
+                <DecisionPill key={it.key} title={it.title} answer={it.answer} />
+              ),
+            )
           )}
           {error && (
-            <div className="mx-2 mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-5 py-3 text-sm text-destructive">
               {error.message ?? "Something went wrong with the AI gateway."}
             </div>
           )}
@@ -404,22 +354,53 @@ function ChatPanel() {
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="px-6 pb-6 pt-2">
-        <PromptInput
-          onSubmit={async (msg) => {
-            await handleSend(msg.text ?? input);
-          }}
-        >
-          <PromptInputTextarea
-            autoFocus
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type freely, or just click the card above…"
-          />
-          <PromptInputFooter className="justify-end">
-            <PromptInputSubmit status={status} disabled={busy && !input} />
-          </PromptInputFooter>
-        </PromptInput>
+      {/* Anchored composer: active card stacks directly above the input */}
+      <div className="border-t border-border/60 bg-background/80 backdrop-blur">
+        <div className="mx-auto w-full max-w-3xl px-8 pb-8 pt-6">
+          {busy && (
+            <div className="mb-4 rounded-3xl border border-border bg-card p-6 shadow-elegant">
+              <Shimmer>Designing the next step…</Shimmer>
+            </div>
+          )}
+          {!busy && activeCard && (
+            <div className="mb-4">
+              <GenerativeCard
+                key={activeCard.key}
+                html={activeCard.html}
+                onAnswer={handleSend}
+              />
+            </div>
+          )}
+          {!busy && !activeCard && history.length === 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {STARTERS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleSend(s)}
+                  className="rounded-full border border-border bg-card px-5 py-2.5 text-base font-medium text-foreground transition hover:border-primary/50 hover:shadow-glow"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+          <PromptInput
+            onSubmit={async (msg) => {
+              await handleSend(msg.text ?? input);
+            }}
+          >
+            <PromptInputTextarea
+              autoFocus
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type freely…"
+              className="text-lg"
+            />
+            <PromptInputFooter className="justify-end">
+              <PromptInputSubmit status={status} disabled={busy && !input} />
+            </PromptInputFooter>
+          </PromptInput>
+        </div>
       </div>
     </div>
   );
