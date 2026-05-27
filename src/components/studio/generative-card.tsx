@@ -500,17 +500,25 @@ export function GenerativeCard({
 export function DecisionPill({
   title,
   answer,
+  onRevise,
 }: {
   title: string;
   answer: string;
+  onRevise?: () => void;
 }) {
   return (
-    <div className="ml-auto flex max-w-[80%] animate-pill-land flex-col gap-1.5 self-end rounded-3xl bg-secondary px-5 py-3.5 text-foreground shadow-elegant">
+    <button
+      type="button"
+      onClick={onRevise}
+      disabled={!onRevise}
+      title={onRevise ? "Revise this decision" : undefined}
+      className="ml-auto flex max-w-[80%] animate-pill-land flex-col gap-1.5 self-end rounded-3xl bg-secondary px-5 py-3.5 text-left text-foreground shadow-elegant transition enabled:cursor-pointer enabled:hover:shadow-glow"
+    >
       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </span>
       <span className="text-base leading-snug">{answer}</span>
-    </div>
+    </button>
   );
 }
 
