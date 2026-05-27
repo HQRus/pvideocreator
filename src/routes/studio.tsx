@@ -255,7 +255,7 @@ function StudioTopBar({
       >
         <ChevronLeft className="h-4 w-4" />
       </Link>
-      <div className="pointer-events-auto flex flex-col items-center gap-3">
+      <div className="pointer-events-auto flex flex-col items-center gap-6">
         <img src={symbolLogo} alt="Symbol" className="h-[21px] w-auto brightness-0" />
         <div className="flex items-center gap-3.5 rounded-full bg-foreground px-6 py-2.5 shadow-elegant">
           <ReelableMark className="h-7 w-7" />
