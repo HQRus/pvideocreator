@@ -522,7 +522,7 @@ export const Route = createFileRoute("/api/chat")({
           model,
           system: SYSTEM_PROMPT,
           tools: tools as never,
-          stopWhen: stepCountIs(50),
+          stopWhen: stepCountIs(50) as never,
           messages: await convertToModelMessages(messages as UIMessage[]),
           onFinish: async () => {
             if (pikaClient) {
