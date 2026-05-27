@@ -223,10 +223,10 @@ function ChatPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Director</span>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center justify-between px-6 py-5">
+        <div className="flex items-center gap-3">
+          <span className="font-display text-lg tracking-tight">Director</span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             AI · live
           </span>
         </div>
@@ -236,20 +236,27 @@ function ChatPanel() {
       </div>
 
       <Conversation className="flex-1">
-        <ConversationContent className="px-4">
+        <ConversationContent className="gap-6 px-6 py-8">
           {messages.length === 0 ? (
             <ConversationEmptyState
-              className="px-2"
-              icon={<ReelableMark className="h-10 w-10" />}
+              className="gap-6 px-4 py-12"
+              icon={<ReelableMark className="h-14 w-14" />}
               title="What are we making?"
-              description="Type anything — even one word. I'll generate the next step as something you can click."
+              description="Type one word. I'll do the rest."
             >
-              <div className="mt-4 flex w-full flex-col gap-1.5">
+              <ReelableMark className="h-16 w-16" />
+              <h3 className="font-display text-3xl tracking-tight">
+                What are we making?
+              </h3>
+              <p className="text-base text-muted-foreground">
+                Type one word. I'll do the rest.
+              </p>
+              <div className="mt-6 flex w-full flex-col gap-2.5">
                 {STARTERS.map((s) => (
                   <button
                     key={s}
                     onClick={() => handleSend(s)}
-                    className="rounded-lg border border-border bg-card/40 px-3 py-2 text-left text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+                    className="rounded-2xl border border-border bg-card px-5 py-4 text-left text-base font-medium text-foreground shadow-elegant transition hover:border-primary/50 hover:shadow-glow"
                   >
                     {s}
                   </button>
@@ -297,7 +304,7 @@ function ChatPanel() {
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="border-t border-border/60 p-3">
+      <div className="px-6 pb-6 pt-2">
         <PromptInput
           onSubmit={async (msg) => {
             await handleSend(msg.text ?? input);

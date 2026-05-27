@@ -81,7 +81,7 @@ export function GenerativeCard({
   return (
     <div
       ref={ref}
-      className="generative-card w-full rounded-xl border border-border bg-card/60 p-4 shadow-elegant"
+      className="generative-card w-full rounded-3xl border border-border bg-card p-6 text-base leading-relaxed shadow-elegant sm:p-8"
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: safe }}
     />
@@ -96,7 +96,7 @@ export function DecisionPill({
   answer: string;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs">
+    <div className="flex items-center gap-2 self-start rounded-full border border-border bg-muted/50 px-4 py-2 text-sm">
       <span className="font-medium text-muted-foreground">{title}</span>
       <span className="text-muted-foreground/60">·</span>
       <span className="truncate text-foreground">{answer}</span>
@@ -106,7 +106,7 @@ export function DecisionPill({
 
 export function UserBubble({ text }: { text: string }) {
   return (
-    <div className="ml-auto max-w-[85%] rounded-lg bg-secondary px-3 py-2 text-sm text-foreground">
+    <div className="ml-auto max-w-[80%] rounded-3xl bg-secondary px-5 py-3.5 text-base leading-snug text-foreground shadow-elegant">
       {text}
     </div>
   );
