@@ -656,7 +656,15 @@ function StructurePanel({
   onSelect,
   totalDuration,
 }: {
-  meta: { title: string; format: string; aspectRatio: string; logline: string };
+  meta: {
+    title: string;
+    format: string;
+    aspectRatio: string;
+    logline: string;
+    targetDuration: string;
+    fps: string;
+    resolution: string;
+  };
   scenes: Scene[];
   setScenes: (s: Scene[]) => void;
   cast: Character[];
@@ -680,6 +688,7 @@ function StructurePanel({
             {meta.logline ||
               "Your video's overview will appear here and evolve as you make decisions in the chat."}
           </p>
+          <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
         </div>
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
