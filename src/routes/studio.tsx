@@ -12,13 +12,14 @@ import {
   Users,
   Music2,
   Clock,
-  MoreHorizontal,
   GripVertical,
   Plus,
   ImagePlus,
   Wand2,
   ChevronLeft,
+  ChevronRight,
   Maximize2,
+  FolderOpen,
 } from "lucide-react";
 import {
   ResizablePanelGroup,
@@ -29,10 +30,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Conversation,
   ConversationContent,
-  ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputTextarea,
@@ -99,26 +98,124 @@ function Studio() {
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
-      <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
-      <div className="flex-1 overflow-hidden border-t border-border/60">
-        <ResizablePanelGroup orientation="horizontal" className="h-full">
-          <ResizablePanel defaultSize={42} minSize={28} className="bg-sidebar/40">
-            <ChatPanel />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={58} minSize={40}>
-            <StructurePanel
-              scenes={scenes}
-              setScenes={setScenes}
-              activeSceneId={activeSceneId}
-              onSelect={setActiveSceneId}
-              totalDuration={totalDuration}
-            />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+    <div className="flex h-screen w-full bg-background text-foreground">
+      <GalleryRail />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
+        <div className="flex-1 overflow-hidden border-t border-border/60">
+          <ResizablePanelGroup orientation="horizontal" className="h-full">
+            <ResizablePanel defaultSize={67} minSize={40} className="bg-sidebar/30">
+              <ChatPanel />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={33} minSize={22}>
+              <StructurePanel
+                scenes={scenes}
+                setScenes={setScenes}
+                activeSceneId={activeSceneId}
+                onSelect={setActiveSceneId}
+                totalDuration={totalDuration}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       </div>
     </div>
+  );
+}
+
+// ---------- gallery rail (left, projects) ----------
+
+const GALLERY_PROJECTS = [
+  { id: "p1", title: "Neon Drift", meta: "Music video · 9:16", thumb: sample1, active: true },
+  { id: "p2", title: "Coastline", meta: "Short film · 16:9", thumb: sample2 },
+  { id: "p3", title: "Powder Run", meta: "Sports edit · 9:16", thumb: sample3 },
+  { id: "p4", title: "Atelier", meta: "Brand spot · 1:1", thumb: sample4 },
+  { id: "p5", title: "Late Bloom", meta: "Music video · 9:16", thumb: sample2 },
+];
+
+function GalleryRail() {
+  const [open, setOpen] = useState(false);
+  return (
+    <aside
+      className={`relative flex h-full shrink-0 flex-col border-r border-border/60 bg-sidebar/60 transition-all duration-300 ${
+        open ? "w-72" : "w-16"
+      }`}
+    >
+      <div className="flex h-14 items-center justify-between px-3">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label={open ? "Collapse gallery" : "Expand gallery"}
+        >
+          {open ? <ChevronLeft className="h-4 w-4" /> : <FolderOpen className="h-4 w-4" />}
+        </button>
+        {open && (
+          <span className="font-display text-base tracking-tight">Gallery</span>
+        )}
+        {open && (
+          <button className="grid h-9 w-9 place-items-center rounded-full bg-brand-gradient text-primary-foreground shadow-glow hover:opacity-95">
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
+        {open ? (
+          <div className="flex flex-col gap-2">
+            {GALLERY_PROJECTS.map((p) => (
+              <button
+                key={p.id}
+                className={`flex items-center gap-3 rounded-2xl border p-2 text-left transition ${
+                  p.active
+                    ? "border-primary/60 bg-card shadow-elegant"
+                    : "border-transparent hover:border-border hover:bg-card"
+                }`}
+              >
+                <img
+                  src={p.thumb}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{p.title}</div>
+                  <div className="truncate text-xs text-muted-foreground">{p.meta}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            {GALLERY_PROJECTS.map((p) => (
+              <button
+                key={p.id}
+                title={p.title}
+                className={`h-12 w-12 overflow-hidden rounded-xl border transition ${
+                  p.active
+                    ? "border-primary/60 shadow-glow"
+                    : "border-transparent hover:border-border"
+                }`}
+              >
+                <img src={p.thumb} alt={p.title} className="h-full w-full object-cover" />
+              </button>
+            ))}
+            <button className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground">
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="absolute -right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant hover:text-foreground"
+          aria-label="Expand gallery"
+        >
+          <ChevronRight className="h-3 w-3" />
+        </button>
+      )}
+    </aside>
   );
 }
 
@@ -184,119 +281,69 @@ function ChatPanel() {
     await sendMessage({ text: trimmed });
   };
 
-  // Pair assistant cards with the user message that answered them.
-  // Render the last assistant card as interactive; older ones collapse to pills.
   const textOf = (m: UIMessage) =>
     m.parts
       .map((p) => (p.type === "text" ? p.text : ""))
       .join("")
       .trim();
 
-  const items: Array<
+  // History items = everything that's "decided". The most recent assistant
+  // card (if not yet answered) is the *active* card, rendered anchored
+  // above the input — NOT inside the scroll history.
+  const history: Array<
     | { kind: "user"; key: string; text: string }
     | { kind: "pill"; key: string; title: string; answer: string }
-    | { kind: "card"; key: string; html: string }
   > = [];
+  let activeCard: { key: string; html: string } | null = null;
 
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i];
     if (m.role === "user") {
       const prev = messages[i - 1];
       if (!prev || prev.role === "user") {
-        items.push({ kind: "user", key: m.id, text: textOf(m) });
+        history.push({ kind: "user", key: m.id, text: textOf(m) });
       }
       continue;
     }
     const html = textOf(m);
     const next = messages[i + 1];
     if (next && next.role === "user") {
-      items.push({
+      history.push({
         kind: "pill",
         key: m.id,
         title: extractCardTitle(html),
         answer: textOf(next),
       });
     } else {
-      items.push({ kind: "card", key: m.id, html });
+      activeCard = { key: m.id, html };
     }
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-3">
-          <span className="font-display text-lg tracking-tight">Director</span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            AI · live
-          </span>
-        </div>
-        <Button variant="ghost" size="icon-sm">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </div>
-
       <Conversation className="flex-1">
-        <ConversationContent className="gap-6 px-6 py-8">
-          {messages.length === 0 ? (
-            <ConversationEmptyState
-              className="gap-6 px-4 py-12"
-              icon={<ReelableMark className="h-14 w-14" />}
-              title="What are we making?"
-              description="Type one word. I'll do the rest."
-            >
-              <ReelableMark className="h-16 w-16" />
-              <h3 className="font-display text-3xl tracking-tight">
+        <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
+          {history.length === 0 && !activeCard ? (
+            <div className="flex h-full flex-col items-center justify-center gap-8 py-16 text-center">
+              <ReelableMark className="h-20 w-20" />
+              <h1 className="font-display text-5xl tracking-tight">
                 What are we making?
-              </h3>
-              <p className="text-base text-muted-foreground">
-                Type one word. I'll do the rest.
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Type one word below. I'll take it from there.
               </p>
-              <div className="mt-6 flex w-full flex-col gap-2.5">
-                {STARTERS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleSend(s)}
-                    className="rounded-2xl border border-border bg-card px-5 py-4 text-left text-base font-medium text-foreground shadow-elegant transition hover:border-primary/50 hover:shadow-glow"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </ConversationEmptyState>
+            </div>
           ) : (
-            items.map((it) => {
-              if (it.kind === "user") {
-                return <UserBubble key={it.key} text={it.text} />;
-              }
-              if (it.kind === "pill") {
-                return (
-                  <DecisionPill key={it.key} title={it.title} answer={it.answer} />
-                );
-              }
-              // active card — hide while streaming, show shimmer instead
-              if (status === "streaming") {
-                return (
-                  <Message key={it.key} from="assistant">
-                    <Shimmer>Designing the next step…</Shimmer>
-                  </Message>
-                );
-              }
-              return (
-                <GenerativeCard
-                  key={it.key}
-                  html={it.html}
-                  onAnswer={handleSend}
-                />
-              );
-            })
-          )}
-          {status === "submitted" && (
-            <Message from="assistant">
-              <Shimmer>Designing the next step…</Shimmer>
-            </Message>
+            history.map((it) =>
+              it.kind === "user" ? (
+                <UserBubble key={it.key} text={it.text} />
+              ) : (
+                <DecisionPill key={it.key} title={it.title} answer={it.answer} />
+              ),
+            )
           )}
           {error && (
-            <div className="mx-2 mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-5 py-3 text-sm text-destructive">
               {error.message ?? "Something went wrong with the AI gateway."}
             </div>
           )}
@@ -304,22 +351,53 @@ function ChatPanel() {
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="px-6 pb-6 pt-2">
-        <PromptInput
-          onSubmit={async (msg) => {
-            await handleSend(msg.text ?? input);
-          }}
-        >
-          <PromptInputTextarea
-            autoFocus
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type freely, or just click the card above…"
-          />
-          <PromptInputFooter className="justify-end">
-            <PromptInputSubmit status={status} disabled={busy && !input} />
-          </PromptInputFooter>
-        </PromptInput>
+      {/* Anchored composer: active card stacks directly above the input */}
+      <div className="border-t border-border/60 bg-background/80 backdrop-blur">
+        <div className="mx-auto w-full max-w-3xl px-8 pb-8 pt-6">
+          {busy && (
+            <div className="mb-4 rounded-3xl border border-border bg-card p-6 shadow-elegant">
+              <Shimmer>Designing the next step…</Shimmer>
+            </div>
+          )}
+          {!busy && activeCard && (
+            <div className="mb-4">
+              <GenerativeCard
+                key={activeCard.key}
+                html={activeCard.html}
+                onAnswer={handleSend}
+              />
+            </div>
+          )}
+          {!busy && !activeCard && history.length === 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {STARTERS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleSend(s)}
+                  className="rounded-full border border-border bg-card px-5 py-2.5 text-base font-medium text-foreground transition hover:border-primary/50 hover:shadow-glow"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+          <PromptInput
+            onSubmit={async (msg) => {
+              await handleSend(msg.text ?? input);
+            }}
+          >
+            <PromptInputTextarea
+              autoFocus
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type freely…"
+              className="text-lg"
+            />
+            <PromptInputFooter className="justify-end">
+              <PromptInputSubmit status={status} disabled={busy && !input} />
+            </PromptInputFooter>
+          </PromptInput>
+        </div>
       </div>
     </div>
   );
