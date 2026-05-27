@@ -405,6 +405,14 @@ message. The card is the user-facing response; tool results alone are not.
   <script data-project-patch> block). Prefer this when you are also calling
   another tool in the same turn — keeps state updates atomic.
 
+- pika_* tools (only present when the workspace has connected Pika)
+  Use these to GENERATE ACTUAL VIDEO CLIPS via Pika. Call them when the
+  user has approved a scene/prompt and you're ready to produce moving
+  footage. The returned video URL is auto-attached to project state — do
+  NOT also list it in assetsAppend, just reference its asset id. If no
+  pika_* tool is available, you cannot render video yet — tell the user
+  to connect Pika via the "Connect Pika" pill in the header.
+
 Etiquette: at most 3 tool calls per turn. Tool-generated assets are already
 in project state — do NOT also list them in assetsAppend, just reference
 them by id.
@@ -489,7 +497,26 @@ export const Route = createFileRoute("/api/chat")({
               return { ok: true, patch };
             },
           }),
-        };
+        } as Record<string, ReturnType<typeof tool>>;
+
+        // Merge in Pika MCP tools if the workspace has an active connection.
+        let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
+        try {
+          if ((await getStatus()) === "ready") {
+            const redirectUri = callbackUrlFromRequest(request);
+            pikaClient = await openPikaMCPClient(redirectUri);
+            const pikaTools = await pikaClient.tools();
+            for (const [name, t] of Object.entries(pikaTools)) {
+              tools[`pika_${name}`] = t as ReturnType<typeof tool>;
+            }
+          }
+        } catch (err) {
+          console.error("[pika] failed to load MCP tools:", err);
+          if (pikaClient) {
+            try { await pikaClient.close(); } catch {}
+            pikaClient = null;
+          }
+        }
 
         const result = streamText({
           model,
@@ -497,6 +524,16 @@ export const Route = createFileRoute("/api/chat")({
           tools,
           stopWhen: stepCountIs(50),
           messages: await convertToModelMessages(messages as UIMessage[]),
+          onFinish: async () => {
+            if (pikaClient) {
+              try { await pikaClient.close(); } catch {}
+            }
+          },
+          onError: async () => {
+            if (pikaClient) {
+              try { await pikaClient.close(); } catch {}
+            }
+          },
         });
 
         return result.toUIMessageStreamResponse({
