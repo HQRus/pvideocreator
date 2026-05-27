@@ -166,12 +166,23 @@ export function callbackUrlFromRequest(req: Request): string {
 export async function beginConnect(
   redirectUri: string,
 ): Promise<{ state: "ready" } | { state: "authenticating"; authUrl: string }> {
+  const existing = await loadRow();
+  const registeredRedirects = Array.isArray(
+    (existing?.client_information as { redirect_uris?: unknown } | null)?.redirect_uris,
+  )
+    ? (((existing?.client_information as { redirect_uris?: string[] | undefined } | null)
+        ?.redirect_uris ?? []) as string[])
+    : [];
+  const shouldResetClientInformation =
+    registeredRedirects.length > 0 && !registeredRedirects.includes(redirectUri);
+
   // Reset any stale flow artifacts but keep client_information so we don't
   // re-register on every retry.
   await upsertRow({
     server_url: PIKA_MCP_URL,
     code_verifier: null,
     oauth_state: null,
+    client_information: shouldResetClientInformation ? null : undefined,
   });
 
   const capture: Capture = {};
