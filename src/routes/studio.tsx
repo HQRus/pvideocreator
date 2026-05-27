@@ -441,7 +441,7 @@ function ChatPanel({
           </div>
           {history.map((it) =>
             it.kind === "user" ? (
-              <UserBubble key={it.key} text={it.text} />
+              <UserBubble key={it.key} text={it.text} assets={assets} />
             ) : it.kind === "assistant" ? (
               <AssistantMessage key={it.key} text={it.text} />
             ) : (
