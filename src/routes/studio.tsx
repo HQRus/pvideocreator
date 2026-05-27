@@ -139,11 +139,11 @@ const GALLERY_PROJECTS = [
   { id: "p5", title: "Late Bloom", meta: "Music video · 9:16", thumb: sample2 },
 ];
 
-function GalleryRail() {
+function FloatingGallery() {
   const [open, setOpen] = useState(false);
   return (
     <aside
-      className={`relative flex h-full shrink-0 flex-col border-r border-border/60 bg-sidebar/60 transition-all duration-300 ${
+      className={`pointer-events-auto absolute left-4 top-4 bottom-4 z-30 flex flex-col rounded-3xl border border-border/60 bg-card/80 shadow-elegant backdrop-blur-xl transition-all duration-300 ${
         open ? "w-72" : "w-16"
       }`}
     >
@@ -230,13 +230,17 @@ function StudioTopBar({
   meta,
   duration,
   sceneCount,
+  panelOpen,
+  onTogglePanel,
 }: {
   meta: { title: string; format: string; aspectRatio: string };
   duration: number;
   sceneCount: number;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 px-4">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 pl-24 pr-4">
       <div className="flex items-center gap-3">
         <Link to="/" className="text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" />
@@ -249,17 +253,13 @@ function StudioTopBar({
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" className="gap-1.5">
-          <Share2 className="h-3.5 w-3.5" /> Share
-        </Button>
-        <Button variant="ghost" size="sm" className="gap-1.5">
-          <Download className="h-3.5 w-3.5" /> Export
-        </Button>
-        <button className="ml-1 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-95">
-          <Wand2 className="h-3.5 w-3.5" /> Render
-        </button>
-      </div>
+      <button
+        onClick={onTogglePanel}
+        className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label={panelOpen ? "Collapse project panel" : "Open project panel"}
+      >
+        {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
     </header>
   );
 }
