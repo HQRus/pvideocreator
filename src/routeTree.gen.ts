@@ -13,6 +13,7 @@ import { Route as StudioRouteImport } from './routes/studio'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiPikaStatusRouteImport } from './routes/api/pika/status'
+import { Route as ApiPikaConnectRouteImport } from './routes/api/pika/connect'
 import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
 
 const StudioRoute = StudioRouteImport.update({
@@ -35,6 +36,11 @@ const ApiPikaStatusRoute = ApiPikaStatusRouteImport.update({
   path: '/api/pika/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPikaConnectRoute = ApiPikaConnectRouteImport.update({
+  id: '/api/pika/connect',
+  path: '/api/pika/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAssetIdRoute = ApiAssetIdRouteImport.update({
   id: '/api/asset/$id',
   path: '/api/asset/$id',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/studio': typeof StudioRoute
   '/api/chat': typeof ApiChatRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
+  '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/status': typeof ApiPikaStatusRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/studio': typeof StudioRoute
   '/api/chat': typeof ApiChatRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
+  '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/status': typeof ApiPikaStatusRoute
 }
 export interface FileRoutesById {
@@ -61,6 +69,7 @@ export interface FileRoutesById {
   '/studio': typeof StudioRoute
   '/api/chat': typeof ApiChatRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
+  '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/status': typeof ApiPikaStatusRoute
 }
 export interface FileRouteTypes {
@@ -70,15 +79,23 @@ export interface FileRouteTypes {
     | '/studio'
     | '/api/chat'
     | '/api/asset/$id'
+    | '/api/pika/connect'
     | '/api/pika/status'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/studio' | '/api/chat' | '/api/asset/$id' | '/api/pika/status'
+  to:
+    | '/'
+    | '/studio'
+    | '/api/chat'
+    | '/api/asset/$id'
+    | '/api/pika/connect'
+    | '/api/pika/status'
   id:
     | '__root__'
     | '/'
     | '/studio'
     | '/api/chat'
     | '/api/asset/$id'
+    | '/api/pika/connect'
     | '/api/pika/status'
   fileRoutesById: FileRoutesById
 }
@@ -87,6 +104,7 @@ export interface RootRouteChildren {
   StudioRoute: typeof StudioRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiAssetIdRoute: typeof ApiAssetIdRoute
+  ApiPikaConnectRoute: typeof ApiPikaConnectRoute
   ApiPikaStatusRoute: typeof ApiPikaStatusRoute
 }
 
@@ -120,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPikaStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pika/connect': {
+      id: '/api/pika/connect'
+      path: '/api/pika/connect'
+      fullPath: '/api/pika/connect'
+      preLoaderRoute: typeof ApiPikaConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/asset/$id': {
       id: '/api/asset/$id'
       path: '/api/asset/$id'
@@ -135,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioRoute: StudioRoute,
   ApiChatRoute: ApiChatRoute,
   ApiAssetIdRoute: ApiAssetIdRoute,
+  ApiPikaConnectRoute: ApiPikaConnectRoute,
   ApiPikaStatusRoute: ApiPikaStatusRoute,
 }
 export const routeTree = rootRouteImport
