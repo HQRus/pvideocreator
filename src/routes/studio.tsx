@@ -84,7 +84,7 @@ function Studio() {
     setProject((prev) => ({ ...prev, scenes: next }));
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-background p-5 text-foreground">
+    <div className="relative h-screen w-full overflow-hidden bg-background p-10 text-foreground">
       {/* Centered chat fills the screen; gallery & project panel float over it */}
       <div className="absolute inset-0 flex flex-col">
         <StudioTopBar
