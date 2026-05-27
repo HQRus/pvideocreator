@@ -281,6 +281,12 @@ panel updates live.
 Examples of when to patch (do not wait for "enough" info):
 - Turn 1, user says "music video for my song" → patch meta.format="Music video".
   If they give a working title or vibe word, patch meta.title too.
+- meta.title MUST be set within the first 1–2 turns. It shows in the top-center
+  pill — "Untitled project" should disappear FAST. If the user hasn't named
+  the project yet, infer a short evocative working title (2–4 words) from
+  whatever they've said (vibe, song name, character, setting) and patch
+  meta.title with it. You can refine it later. Never leave it as "Untitled
+  project" past turn 2.
 - User picks 9:16 → patch meta.aspectRatio immediately.
 - User mentions length ("30 second", "2 minute", "short") → patch
   meta.targetDuration with a short human string ("30s", "2 min").
