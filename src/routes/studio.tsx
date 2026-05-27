@@ -294,6 +294,7 @@ function ChatPanel() {
   // above the input — NOT inside the scroll history.
   const history: Array<
     | { kind: "user"; key: string; text: string }
+    | { kind: "assistant"; key: string; text: string }
     | { kind: "pill"; key: string; title: string; answer: string }
   > = [];
   let activeCard: { key: string; html: string } | null = null;
@@ -310,6 +311,11 @@ function ChatPanel() {
     const html = textOf(m);
     const next = messages[i + 1];
     if (next && next.role === "user") {
+      const prose =
+        extractCardProse(html) || extractCardTitle(html);
+      if (prose) {
+        history.push({ kind: "assistant", key: `a-${m.id}`, text: prose });
+      }
       history.push({
         kind: "pill",
         key: m.id,
@@ -332,6 +338,8 @@ function ChatPanel() {
           {history.map((it) =>
             it.kind === "user" ? (
               <UserBubble key={it.key} text={it.text} />
+            ) : it.kind === "assistant" ? (
+              <AssistantMessage key={it.key} text={it.text} />
             ) : (
               <DecisionPill key={it.key} title={it.title} answer={it.answer} />
             ),
