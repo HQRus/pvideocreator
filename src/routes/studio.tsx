@@ -353,7 +353,7 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
   }, [messages.length, activeCard?.key, busy]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <Conversation className="flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
           <div className="flex flex-col items-start gap-6 pt-6">
