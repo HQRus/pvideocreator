@@ -883,6 +883,36 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
+function AssetsStrip({ assets }: { assets: ProjectAsset[] }) {
+  return (
+    <div className="mt-5">
+      <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+        References
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {assets.map((a) => (
+          <div
+            key={a.id}
+            className="group relative overflow-hidden rounded-xl border border-border/60 bg-muted/40"
+            title={`${a.kind} · ${a.name}`}
+          >
+            {a.mime.startsWith("image/") ? (
+              <img src={a.url} alt={a.name} className="h-16 w-16 object-cover" />
+            ) : (
+              <div className="grid h-16 w-16 place-items-center text-lg text-muted-foreground">
+                {a.mime.startsWith("audio/") ? "♪" : a.mime.startsWith("video/") ? "▶" : "•"}
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent px-1.5 pb-1 pt-3 text-[9px] font-semibold capitalize text-foreground">
+              {a.kind}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TechSpecs({
   meta,
   totalDuration,
