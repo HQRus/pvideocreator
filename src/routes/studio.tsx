@@ -103,6 +103,7 @@ function Studio() {
           >
             <div className="h-full w-[440px]">
               <StructurePanel
+                meta={meta}
                 scenes={scenes}
                 setScenes={setScenes}
                 cast={cast}
