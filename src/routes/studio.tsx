@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Play,
   Pause,
@@ -785,7 +785,7 @@ function StructurePanel({
   );
 }
 
-function EmptyHint({ icon, text }: { icon: React.ReactNode; text: string }) {
+function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/20 px-4 py-10 text-center text-xs text-muted-foreground">
       <div className="text-muted-foreground/70">{icon}</div>
