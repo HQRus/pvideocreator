@@ -30,6 +30,9 @@ export type ProjectMeta = {
   format: string; // "Music video", "Short film", ...
   aspectRatio: string; // "9:16", "16:9", ...
   logline: string; // 1–2 sentence evolving description of the video
+  targetDuration: string; // human-readable length, e.g. "30s", "2 min"
+  fps: string; // "24", "30", "60"
+  resolution: string; // "1080p", "4K"
 };
 
 export type ProjectState = {
@@ -57,6 +60,9 @@ export const INITIAL_PROJECT: ProjectState = {
     format: "—",
     aspectRatio: "—",
     logline: "",
+    targetDuration: "",
+    fps: "",
+    resolution: "",
   },
   scenes: [],
   cast: [],

@@ -157,7 +157,7 @@ function FloatingGallery() {
           <FolderOpen className="h-4 w-4" />
         </div>
         {open && (
-          <span className="font-display text-base tracking-tight">Gallery</span>
+          <span className="font-display text-base tracking-tight">Projects</span>
         )}
         {open && (
           <button
@@ -166,7 +166,7 @@ function FloatingGallery() {
               setOpen(false);
             }}
             className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Collapse gallery"
+            aria-label="Collapse projects"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -656,7 +656,15 @@ function StructurePanel({
   onSelect,
   totalDuration,
 }: {
-  meta: { title: string; format: string; aspectRatio: string; logline: string };
+  meta: {
+    title: string;
+    format: string;
+    aspectRatio: string;
+    logline: string;
+    targetDuration: string;
+    fps: string;
+    resolution: string;
+  };
   scenes: Scene[];
   setScenes: (s: Scene[]) => void;
   cast: Character[];
@@ -680,6 +688,7 @@ function StructurePanel({
             {meta.logline ||
               "Your video's overview will appear here and evolve as you make decisions in the chat."}
           </p>
+          <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
         </div>
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
@@ -854,6 +863,50 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
         {icon}
       </div>
       <div className="max-w-[260px] text-base font-medium leading-relaxed text-muted-foreground">{text}</div>
+    </div>
+  );
+}
+
+function TechSpecs({
+  meta,
+  totalDuration,
+  sceneCount,
+}: {
+  meta: {
+    aspectRatio: string;
+    targetDuration: string;
+    fps: string;
+    resolution: string;
+  };
+  totalDuration: number;
+  sceneCount: number;
+}) {
+  const clean = (v: string) => (v && v !== "—" ? v : "");
+  const length =
+    clean(meta.targetDuration) ||
+    (totalDuration > 0 ? formatDuration(totalDuration) : "");
+  const specs: { label: string; value: string }[] = [
+    { label: "Aspect", value: clean(meta.aspectRatio) || "—" },
+    { label: "Length", value: length || "—" },
+    { label: "Scenes", value: sceneCount > 0 ? String(sceneCount) : "—" },
+    { label: "FPS", value: clean(meta.fps) || "—" },
+    { label: "Resolution", value: clean(meta.resolution) || "—" },
+  ];
+  return (
+    <div className="mt-5 flex flex-wrap gap-2">
+      {specs.map((s) => (
+        <div
+          key={s.label}
+          className="flex items-baseline gap-1.5 rounded-full bg-muted/60 px-3 py-1.5"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            {s.label}
+          </span>
+          <span className="text-xs font-semibold tracking-tight text-foreground">
+            {s.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
