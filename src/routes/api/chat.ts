@@ -147,13 +147,30 @@ Embed the patch as a single hidden script tag, placed INSIDE the <div data-card>
 
 Patch schema (every field optional, omit what you're not changing):
 {
-  "meta": { "title": string, "format": string, "aspectRatio": "9:16"|"16:9"|"1:1"|"4:5" },
+  "meta": {
+    "title": string,
+    "format": string,
+    "aspectRatio": "9:16"|"16:9"|"1:1"|"4:5",
+    "logline": string
+  },
   "scenes": [ { "n": number, "title": string, "prompt": string, "duration": number } ],
   "scenesAppend": [ ...same shape, appended to existing scenes ],
   "cast": [ { "name": string, "role": string, "notes": string } ],
   "castAppend": [ ...same shape ],
   "music": { "title": string, "artist": string, "bpm": number, "key": string, "duration": number }
 }
+
+"meta.logline" is the human-readable OVERVIEW of the video, shown at the top
+of the project panel. Treat it as a living description that evolves with
+every meaningful decision. Rules:
+- 1–2 short sentences, present tense, evocative but concrete.
+- Update it any time the concept, vibe, characters, setting, or structure
+  meaningfully changes — re-emit the full new logline (it replaces the
+  previous one).
+- On the very first turn where the user names a format or vibe, set an
+  initial logline even if rough (e.g. "A high-energy 9:16 music video,
+  vibe still TBD."). Refine it as you go.
+- Never leave it blank once you have ANY concept signal.
 
 Rules for patches:
 - Use "scenes" / "cast" to REPLACE the full list. Use "scenesAppend" / "castAppend" to add to it.

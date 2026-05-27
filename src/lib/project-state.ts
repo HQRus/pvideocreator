@@ -29,6 +29,7 @@ export type ProjectMeta = {
   title: string;
   format: string; // "Music video", "Short film", ...
   aspectRatio: string; // "9:16", "16:9", ...
+  logline: string; // 1–2 sentence evolving description of the video
 };
 
 export type ProjectState = {
@@ -55,6 +56,7 @@ export const INITIAL_PROJECT: ProjectState = {
     title: "Untitled project",
     format: "—",
     aspectRatio: "—",
+    logline: "",
   },
   scenes: [],
   cast: [],
