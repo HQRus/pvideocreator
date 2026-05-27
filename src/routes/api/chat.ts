@@ -82,22 +82,25 @@ The card MUST contain at least one interactive control so the user can answer.
      </form>
    </div>
 
-3) STORYBOARD / SCENE PROPOSAL (when there's enough info to propose shots):
+3) PROJECT-ARTIFACT HANDOFF (when you've drafted something concrete like a
+   storyboard, cast list, music brief, or shot list):
+   DO NOT render the artifact itself in the chat (no scene grids, no cast
+   tiles, no music players, no beat maps). Those live in the right-hand
+   Project panel. The chat card is just a short handoff with confirm/revise:
+
    <div data-card data-card-title="Storyboard v1">
-     <p data-prose>Here's a first pass at the storyboard — five beats. Tell me which scene to rework, or lock it in.</p>
-     <div class="grid grid-cols-3 gap-3">
-       <div class="rounded-2xl border border-border bg-card p-3">
-         <div class="aspect-[9/16] rounded-xl bg-muted mb-3"></div>
-         <div class="text-base font-semibold leading-tight">1. Cold open</div>
-         <div class="text-sm text-muted-foreground">Wide · 6s</div>
-       </div>
-       <!-- ...more scenes... -->
-     </div>
-     <div class="flex gap-3 justify-end">
-       <button data-action="answer" data-value="Revise the storyboard" class="rounded-full border border-border px-5 py-3 text-base hover:bg-muted">Revise</button>
-       <button data-action="answer" data-value="Lock this storyboard" class="rounded-full bg-brand-gradient px-6 py-3 text-base font-medium text-primary-foreground shadow-glow">Lock it in</button>
+     <p data-prose>I drafted a five-beat storyboard — cold open, helmet close-up, drift, skyline reveal, logo card. Open the Storyboard tab on the right to scrub through it. Want to lock it in or rework anything?</p>
+     <div class="flex flex-wrap gap-3">
+       <button data-action="answer" data-value="Lock the storyboard" class="rounded-full bg-brand-gradient px-6 py-3 text-base font-medium text-primary-foreground shadow-glow">Lock it in</button>
+       <button data-action="answer" data-value="Rework scene 3" class="rounded-full border border-border px-5 py-3 text-base hover:bg-muted">Rework a scene</button>
+       <button data-action="answer" data-value="Try a different structure" class="rounded-full border border-border px-5 py-3 text-base hover:bg-muted">Different structure</button>
      </div>
    </div>
+
+NEVER render project artifacts (scene grids, storyboard tiles, cast galleries,
+music players, timeline strips, beat maps) inside the chat card. Those belong
+in the Project panel. The chat is for QUESTIONS and DECISIONS only — keep
+cards small and conversational.
 
 NEVER include an escape hatch like "Skip — I'll describe it" or "None of these".
 The user always has a free-text input anchored at the bottom of the screen — if none
