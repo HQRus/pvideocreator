@@ -223,10 +223,10 @@ function ChatPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Director</span>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center justify-between px-6 py-5">
+        <div className="flex items-center gap-3">
+          <span className="font-display text-lg tracking-tight">Director</span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             AI · live
           </span>
         </div>
@@ -304,7 +304,7 @@ function ChatPanel() {
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="border-t border-border/60 p-3">
+      <div className="px-6 pb-6 pt-2">
         <PromptInput
           onSubmit={async (msg) => {
             await handleSend(msg.text ?? input);
