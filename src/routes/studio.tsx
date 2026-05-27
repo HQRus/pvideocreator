@@ -664,6 +664,9 @@ function StructurePanel({
 
         <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto p-3">
           <div className="space-y-2">
+            {scenes.length === 0 && (
+              <EmptyHint icon={<Film className="h-4 w-4" />} text="Scenes will appear as you build out the storyboard." />
+            )}
             {scenes.map((s) => (
               <SceneRow
                 key={s.id}
@@ -683,16 +686,25 @@ function StructurePanel({
 
         <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto p-3">
           <div className="space-y-2">
+            {cast.length === 0 && (
+              <EmptyHint icon={<Users className="h-4 w-4" />} text="No cast yet — ask the director to suggest characters." />
+            )}
             {cast.map((c) => (
               <div
                 key={c.id}
                 className="flex gap-3 rounded-lg border border-border bg-card/40 p-2.5"
               >
-                <img
-                  src={c.ref}
-                  alt={c.name}
-                  className="h-16 w-16 shrink-0 rounded-md object-cover"
-                />
+                {c.ref ? (
+                  <img
+                    src={c.ref}
+                    alt={c.name}
+                    className="h-16 w-16 shrink-0 rounded-md object-cover"
+                  />
+                ) : (
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground/60">
+                    <Users className="h-5 w-5" />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium">{c.name}</div>
@@ -713,15 +725,18 @@ function StructurePanel({
         </TabsContent>
 
         <TabsContent value="music" className="m-0 flex-1 overflow-y-auto p-3">
+          {!music ? (
+            <EmptyHint icon={<Music2 className="h-4 w-4" />} text="No music brief yet — describe the vibe or tempo you want." />
+          ) : (
           <div className="rounded-xl border border-border bg-card/40 p-3">
             <div className="flex items-center gap-3">
               <div className="grid h-12 w-12 place-items-center rounded-lg bg-brand-gradient shadow-glow">
                 <Music2 className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{music.title}</div>
+                <div className="text-sm font-medium">{music.title || "Untitled track"}</div>
                 <div className="truncate text-[11px] text-muted-foreground">
-                  {music.artist}
+                  {music.artist || "—"}
                 </div>
               </div>
               <Button variant="ghost" size="icon-sm">
@@ -730,15 +745,15 @@ function StructurePanel({
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{music.bpm}</div>
+                <div className="text-foreground">{music.bpm || "—"}</div>
                 <div className="text-muted-foreground">BPM</div>
               </div>
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{music.key}</div>
+                <div className="text-foreground">{music.key || "—"}</div>
                 <div className="text-muted-foreground">Key</div>
               </div>
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{formatDuration(music.duration)}</div>
+                <div className="text-foreground">{music.duration ? formatDuration(music.duration) : "—"}</div>
                 <div className="text-muted-foreground">Length</div>
               </div>
             </div>
@@ -763,13 +778,18 @@ function StructurePanel({
               </div>
             </div>
           </div>
-
-          <div className="mt-3 rounded-xl border border-border bg-card/40 p-3 text-xs text-muted-foreground">
-            <div className="mb-1 font-medium text-foreground">Sound design</div>
-            Synthwave pad, sub bass drop on scene 3 drift, neon hum bed throughout.
-          </div>
+          )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function EmptyHint({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/20 px-4 py-10 text-center text-xs text-muted-foreground">
+      <div className="text-muted-foreground/70">{icon}</div>
+      <div className="max-w-[220px] leading-relaxed">{text}</div>
     </div>
   );
 }
@@ -795,11 +815,17 @@ function SceneRow({
     >
       <div className="flex gap-2.5">
         <GripVertical className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-        <img
-          src={scene.thumb}
-          alt=""
-          className="h-14 w-10 shrink-0 rounded object-cover"
-        />
+        {scene.thumb ? (
+          <img
+            src={scene.thumb}
+            alt=""
+            className="h-14 w-10 shrink-0 rounded object-cover"
+          />
+        ) : (
+          <div className="grid h-14 w-10 shrink-0 place-items-center rounded bg-muted text-muted-foreground/50">
+            <Film className="h-4 w-4" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
