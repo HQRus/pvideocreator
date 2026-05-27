@@ -124,10 +124,38 @@ function makeProvider(redirectUri: string, capture: Capture): OAuthClientProvide
 }
 
 export function callbackUrlFromRequest(req: Request): string {
-  const u = new URL(req.url);
-  // Force https on lovable hosts; preview/published are always https.
-  const proto = u.hostname.includes("localhost") ? u.protocol : "https:";
-  return `${proto}//${u.host}/api/pika/oauth/callback`;
+  // Prefer forwarded headers (set by the Lovable proxy) so we use the
+  // public origin (e.g. *.lovable.app) instead of the internal localhost:8080.
+  const xfHost = req.headers.get("x-forwarded-host");
+  const xfProto = req.headers.get("x-forwarded-proto");
+  const origin = req.headers.get("origin");
+  const referer = req.headers.get("referer");
+
+  let host: string | null = xfHost;
+  let proto: string | null = xfProto;
+
+  if (!host && origin) {
+    try {
+      const o = new URL(origin);
+      host = o.host;
+      proto = proto ?? o.protocol.replace(":", "");
+    } catch {}
+  }
+  if (!host && referer) {
+    try {
+      const r = new URL(referer);
+      host = r.host;
+      proto = proto ?? r.protocol.replace(":", "");
+    } catch {}
+  }
+  if (!host) {
+    const u = new URL(req.url);
+    host = u.host;
+    proto = proto ?? u.protocol.replace(":", "");
+  }
+
+  const scheme = host.includes("localhost") ? (proto || "http") : "https";
+  return `${scheme}://${host}/api/pika/oauth/callback`;
 }
 
 /**
