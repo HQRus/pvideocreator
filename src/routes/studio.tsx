@@ -810,30 +810,30 @@ function SceneRow({
   return (
     <div
       onClick={onClick}
-      className={`group cursor-pointer rounded-lg border bg-card/40 p-2.5 transition ${
-        active ? "border-primary/60 shadow-glow" : "border-border hover:border-primary/40"
+      className={`group cursor-pointer rounded-2xl border bg-card/40 p-5 transition ${
+        active ? "border-primary/60 shadow-glow" : "border-border/60 hover:border-foreground/30"
       }`}
     >
-      <div className="flex gap-2.5">
-        <GripVertical className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+      <div className="flex gap-4">
+        <GripVertical className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50" />
         {scene.thumb ? (
           <img
             src={scene.thumb}
             alt=""
-            className="h-14 w-10 shrink-0 rounded object-cover"
+            className="h-20 w-14 shrink-0 rounded-xl object-cover"
           />
         ) : (
-          <div className="grid h-14 w-10 shrink-0 place-items-center rounded bg-muted text-muted-foreground/50">
-            <Film className="h-4 w-4" />
+          <div className="grid h-20 w-14 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground/50">
+            <Film className="h-5 w-5" />
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] text-muted-foreground">#{scene.n}</span>
-              <span className="truncate text-xs font-medium">{scene.title}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-semibold text-muted-foreground">#{scene.n}</span>
+              <span className="truncate text-base font-bold tracking-tight">{scene.title}</span>
             </div>
-            <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
               {scene.duration}s
             </span>
           </div>
@@ -846,7 +846,7 @@ function SceneRow({
                 setEditing(false);
               }}
               rows={3}
-              className="mt-1.5 w-full resize-none rounded border border-border bg-background/60 p-1.5 text-[11px] text-foreground focus:border-primary/60 focus:outline-none"
+              className="mt-3 w-full resize-none rounded-xl border border-border bg-background/60 p-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
             />
           ) : (
             <p
@@ -854,7 +854,7 @@ function SceneRow({
                 e.stopPropagation();
                 setEditing(true);
               }}
-              className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground hover:text-foreground"
+              className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground hover:text-foreground"
             >
               {scene.prompt}
             </p>
