@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Sparkles } from "lucide-react";
-import { ReelableMark } from "@/components/reelable-mark";
+import { ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: ConnectGate,
@@ -112,27 +111,12 @@ function ConnectGate() {
         <div className="absolute left-1/2 top-1/3 h-[60vmin] w-[60vmin] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-gradient opacity-30 blur-3xl" />
       </div>
 
-      <header className="flex h-20 items-center px-8">
-        <div className="flex items-center gap-3">
-          <ReelableMark className="h-9 w-9" />
-          <span className="font-display text-lg tracking-tight">Reelable</span>
-        </div>
-      </header>
+      <header className="flex h-20 items-center px-8" />
 
       <section className="mx-auto flex max-w-3xl flex-col items-center px-6 pt-24 text-center sm:pt-32">
-        <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5" /> Powered by Pika · MCP
-        </span>
-
-        <h1 className="mt-6 font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-          A generative video studio,<br /> directed by you.
+        <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+          AI Video Director Prototype
         </h1>
-
-        <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Connect your Pika account once. Reelable's director chat will plan
-          scenes, cast characters, and generate clips for you — all in one
-          continuous workspace.
-        </p>
 
         <button
           onClick={onConnect}
