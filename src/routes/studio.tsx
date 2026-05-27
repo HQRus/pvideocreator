@@ -593,12 +593,16 @@ function StatusDot({ status }: { status: Scene["status"] }) {
 function StructurePanel({
   scenes,
   setScenes,
+  cast,
+  music,
   activeSceneId,
   onSelect,
   totalDuration,
 }: {
   scenes: Scene[];
   setScenes: (s: Scene[]) => void;
+  cast: Character[];
+  music: Music;
   activeSceneId: string;
   onSelect: (id: string) => void;
   totalDuration: number;
@@ -656,7 +660,7 @@ function StructurePanel({
 
         <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto p-3">
           <div className="space-y-2">
-            {CHARACTERS.map((c) => (
+            {cast.map((c) => (
               <div
                 key={c.id}
                 className="flex gap-3 rounded-lg border border-border bg-card/40 p-2.5"
@@ -692,9 +696,9 @@ function StructurePanel({
                 <Music2 className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{MUSIC.title}</div>
+                <div className="text-sm font-medium">{music.title}</div>
                 <div className="truncate text-[11px] text-muted-foreground">
-                  {MUSIC.artist}
+                  {music.artist}
                 </div>
               </div>
               <Button variant="ghost" size="icon-sm">
@@ -703,15 +707,15 @@ function StructurePanel({
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{MUSIC.bpm}</div>
+                <div className="text-foreground">{music.bpm}</div>
                 <div className="text-muted-foreground">BPM</div>
               </div>
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{MUSIC.key}</div>
+                <div className="text-foreground">{music.key}</div>
                 <div className="text-muted-foreground">Key</div>
               </div>
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{formatDuration(MUSIC.duration)}</div>
+                <div className="text-foreground">{formatDuration(music.duration)}</div>
                 <div className="text-muted-foreground">Length</div>
               </div>
             </div>
