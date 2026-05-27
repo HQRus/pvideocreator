@@ -468,6 +468,15 @@ function PreviewPanel({
 
       <div className="flex-1 overflow-auto p-6">
         <div className="mx-auto max-w-4xl">
+          {scenes.length === 0 ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/20 p-10 text-center">
+              <LayoutGrid className="h-6 w-6 text-muted-foreground" />
+              <div className="text-sm font-medium">No scenes yet</div>
+              <div className="max-w-xs text-xs text-muted-foreground">
+                As you chat with the director on the left, scenes will appear here.
+              </div>
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {scenes.map((s) => (
               <SceneTile
@@ -484,6 +493,7 @@ function PreviewPanel({
               </div>
             </button>
           </div>
+          )}
         </div>
       </div>
 
@@ -495,6 +505,11 @@ function PreviewPanel({
           <span>{formatDuration(totalDuration)}</span>
         </div>
         <div className="flex gap-1 overflow-x-auto">
+          {scenes.length === 0 && (
+            <div className="flex-1 rounded-md border border-dashed border-border/60 px-2 py-2 text-center text-[10px] text-muted-foreground/70">
+              Timeline empty
+            </div>
+          )}
           {scenes.map((s) => (
             <button
               key={s.id}
@@ -506,11 +521,13 @@ function PreviewPanel({
                   : "border-border hover:border-primary/40"
               }`}
             >
-              <img
-                src={s.thumb}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover opacity-50 group-hover:opacity-70"
-              />
+              {s.thumb && (
+                <img
+                  src={s.thumb}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover opacity-50 group-hover:opacity-70"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
               <div className="absolute bottom-0.5 left-1 text-[10px] font-medium">
                 #{s.n}
@@ -544,12 +561,18 @@ function SceneTile({
           : "border-border hover:border-primary/40"
       }`}
     >
-      <div className="aspect-[9/16] overflow-hidden">
-        <img
-          src={scene.thumb}
-          alt={scene.title}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
+      <div className="aspect-[9/16] overflow-hidden bg-muted">
+        {scene.thumb ? (
+          <img
+            src={scene.thumb}
+            alt={scene.title}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center text-muted-foreground/50">
+            <Film className="h-6 w-6" />
+          </div>
+        )}
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent" />
       <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-[10px] backdrop-blur">
