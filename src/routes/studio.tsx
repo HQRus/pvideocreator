@@ -249,7 +249,7 @@ function StudioTopBar({
   return (
     <header className="pointer-events-none relative z-20 flex h-16 shrink-0 items-center justify-center px-4">
       <Link
-        to="/"
+        to="/studio"
         className="pointer-events-auto absolute left-24 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
         aria-label="Back home"
       >
