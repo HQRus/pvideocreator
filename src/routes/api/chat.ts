@@ -32,7 +32,8 @@ Layout:    flex, flex-col, flex-row, flex-wrap, grid, grid-cols-2, grid-cols-3, 
            justify-between, justify-center, justify-end, self-end, self-start, col-span-2
 Spacing:   p-4, p-5, p-6, p-8, px-4, px-5, px-6, px-8, py-2, py-3, py-4, py-5,
            mt-2, mt-3, mt-4, mt-6, mt-8, mb-2, mb-3, mb-4, mb-6
-Sizing:    w-full, h-full, aspect-square, aspect-video, aspect-[9/16], min-h-24, min-h-32, max-w-md
+Sizing:    w-full, h-full, aspect-square, aspect-video, aspect-[9/16], min-h-24, min-h-32, max-w-md,
+           h-12, h-16, h-24, h-32, w-12, w-16, w-24, w-32, object-cover
 Type:      text-sm, text-base, text-lg, text-xl, text-2xl, text-3xl, font-medium, font-semibold,
            font-display, leading-tight, leading-snug, leading-relaxed, tracking-tight, text-left
 Colors:    text-foreground, text-muted-foreground, bg-card, bg-muted, bg-muted/50,
@@ -94,6 +95,71 @@ The card MUST contain at least one interactive control so the user can answer.
    confident creative choice yourself, commit it via a project patch, and
    move on to the next decision — do NOT re-ask the same question.
 
+4) UPLOAD / CAPTURE (use whenever you need a real-world asset from the user —
+   a selfie/likeness, a logo, a reference image, a voice sample, a clip,
+   their pet, anything they own). The runtime auto-creates a blob URL,
+   attaches the file to the project state (visible in the right-hand
+   "References" strip), and reports back the asset id like [ast_xxx].
+
+   The "data-kind" attribute tells the panel where to surface the asset.
+   Allowed kinds: "likeness" (selfie/person), "logo", "reference",
+   "voice", "audio", "video", "other".
+
+   <div data-card data-card-title="Your likeness">
+     <p data-prose>I'll put you in the anchor chair — upload a clear, front-facing photo so I can match your look across shots.</p>
+     <div class="flex flex-col gap-3">
+       <label class="flex cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-6 text-base font-medium hover:border-primary/50 hover:bg-muted">
+         <input type="file" data-upload data-kind="likeness" data-value="Selfie" accept="image/*" class="hidden" />
+         Upload a photo
+       </label>
+       <button data-action="capture" data-capture="camera" data-kind="likeness" class="rounded-full border border-border px-5 py-3 text-base hover:bg-muted">Take a photo with my camera</button>
+       <button type="button" data-action="answer" data-value="No reference — describe the look instead" class="rounded-full border border-border px-5 py-3 text-base hover:bg-muted">Skip the photo</button>
+     </div>
+   </div>
+
+   For voice: data-capture="mic" records audio until the user clicks again.
+   For multiple files: add the "multiple" attribute on <input type="file">.
+   File inputs OUTSIDE a form auto-submit on selection. INSIDE a form they
+   stage as previews and submit with the rest of the fields.
+
+5) RICH INPUT PRIMITIVES (use freely — answers come back typed, not stringified):
+
+   - Slider for intensity/pacing/BPM:
+       <input type="range" name="pacing" min="1" max="10" step="1" value="5" data-unit="/10" />
+     Returns a real number.
+
+   - Color picker for brand/grade:
+       <input type="color" name="accent" value="#ff3366" />
+     Returns the hex string.
+
+   - Date / time:
+       <input type="date" name="release" />
+     Returns ISO date string.
+
+   - Multi-select (checkbox grid). All checked values come back as an array:
+       <div class="grid grid-cols-2 gap-3">
+         <label class="flex items-center gap-3 rounded-2xl border border-border p-4 cursor-pointer hover:border-primary/50">
+           <input type="checkbox" name="genres" value="Synthwave" /> <span>Synthwave</span>
+         </label>
+         <label class="flex items-center gap-3 rounded-2xl border border-border p-4 cursor-pointer hover:border-primary/50">
+           <input type="checkbox" name="genres" value="Lo-fi" /> <span>Lo-fi</span>
+         </label>
+       </div>
+
+   - Long text (lyrics / VO script): textarea with rows="6" or more.
+
+   You can MIX these in a single form alongside file uploads. Every form
+   submission still uses <form data-action="answer"> and a submit button.
+
+6) REFERENCING UPLOADED ASSETS:
+   When the user uploads something, the chat answer to you will look like
+   "selfie / likeness: face.jpg 1024×768 [ast_xyz]". You can refer back to
+   that asset in later cards by its id, and you SHOULD patch it into the
+   right slice of project state — e.g. cast[0].ref = "ast_xyz" — so the
+   panel shows it on the character. To display an uploaded image inside a
+   future card (preview, confirm, compare), use:
+       <img data-asset-ref="ast_xyz" class="h-32 w-32 rounded-2xl object-cover" />
+   The runtime swaps in the real blob URL at render time.
 3) PROJECT-ARTIFACT HANDOFF (when you've drafted something concrete like a
    storyboard, cast list, music brief, or shot list):
    DO NOT render the artifact itself in the chat (no scene grids, no cast
