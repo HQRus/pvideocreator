@@ -262,7 +262,7 @@ function StudioTopBar({
           </span>
         </div>
       </div>
-      <div className="pointer-events-auto absolute right-20 top-1/2 -translate-y-1/2">
+      <div className="pointer-events-auto absolute left-96 top-1/2 -translate-y-1/2">
         <PikaConnectPill />
       </div>
       <button
