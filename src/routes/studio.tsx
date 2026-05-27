@@ -35,7 +35,7 @@ import {
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
-import { ReelableMark } from "@/components/reelable-mark";
+import { BrandMark } from "@/components/reelable-mark";
 import { Button } from "@/components/ui/button";
 import {
   GenerativeCard,
@@ -251,7 +251,7 @@ function StudioTopBar({
       <div className="pointer-events-auto flex flex-col items-center gap-6 pt-6">
         <img src={symbolLogo} alt="Symbol" className="h-[21px] w-auto brightness-0" />
         <div className="flex items-center gap-3.5 rounded-full bg-foreground px-6 py-2.5 shadow-elegant">
-          <ReelableMark className="h-7 w-7" />
+            <BrandMark className="h-7 w-7" />
           <div className="flex items-baseline gap-2.5 leading-tight">
             <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
             <span className="text-xs text-background/60">
@@ -475,7 +475,7 @@ function ChatPanel({
       <Conversation className="flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
           <div className="flex flex-col items-start gap-6 pt-6">
-            <ReelableMark className="h-12 w-12" />
+            <BrandMark className="h-12 w-12" />
             <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
           </div>
           {history.map((it) =>
