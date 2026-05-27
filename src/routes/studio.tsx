@@ -432,6 +432,15 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
           </PromptInput>
         </div>
       </div>
+
+      {/* Flying pill: user's answer lifts off the composer and floats up into the transcript */}
+      {outgoing && (
+        <div className="pointer-events-none absolute bottom-28 left-1/2 z-50 -translate-x-1/2">
+          <div className="max-w-[18rem] animate-pill-fly overflow-hidden rounded-3xl bg-secondary px-5 py-3.5 text-base leading-snug text-foreground shadow-elegant">
+            {outgoing.text}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
