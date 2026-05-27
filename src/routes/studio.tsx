@@ -633,23 +633,22 @@ function StructurePanel({
   return (
     <div className="flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b border-border/60 px-4 py-2.5">
-          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Project
-          </span>
-          <TabsList className="h-7 bg-muted/60">
-            <TabsTrigger value="storyboard" className="h-6 gap-1 px-2 text-xs">
-              <LayoutGrid className="h-3 w-3" /> Storyboard
-            </TabsTrigger>
-            <TabsTrigger value="scenes" className="h-6 gap-1 px-2 text-xs">
-              <Film className="h-3 w-3" /> Scenes
-            </TabsTrigger>
-            <TabsTrigger value="cast" className="h-6 gap-1 px-2 text-xs">
-              <Users className="h-3 w-3" /> Cast
-            </TabsTrigger>
-            <TabsTrigger value="music" className="h-6 gap-1 px-2 text-xs">
-              <Music2 className="h-3 w-3" /> Music
-            </TabsTrigger>
+        <div className="border-b-2 border-border/40 px-8 pt-8 pb-0">
+          <TabsList className="h-auto w-full justify-start gap-8 rounded-none bg-transparent p-0">
+            {[
+              { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
+              { v: "scenes", icon: Film, label: "Scenes" },
+              { v: "cast", icon: Users, label: "Cast" },
+              { v: "music", icon: Music2, label: "Music" },
+            ].map(({ v, icon: Icon, label }) => (
+              <TabsTrigger
+                key={v}
+                value={v}
+                className="-mb-[2px] gap-2 rounded-none border-b-4 border-transparent bg-transparent px-1 pb-4 text-lg font-bold text-muted-foreground/50 shadow-none transition-all data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <Icon className="h-4 w-4" /> {label}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 
@@ -662,10 +661,10 @@ function StructurePanel({
           />
         </TabsContent>
 
-        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto p-3">
-          <div className="space-y-2">
+        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto p-8">
+          <div className="space-y-5">
             {scenes.length === 0 && (
-              <EmptyHint icon={<Film className="h-4 w-4" />} text="Scenes will appear as you build out the storyboard." />
+              <EmptyHint icon={<Film className="h-8 w-8" />} text="Scenes will appear as you build out the storyboard." />
             )}
             {scenes.map((s) => (
               <SceneRow
@@ -678,91 +677,91 @@ function StructurePanel({
                 }
               />
             ))}
-            <button className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-card/30 py-2 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground">
-              <Plus className="h-3.5 w-3.5" /> Add scene
+            <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card/30 py-5 text-base font-semibold text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground">
+              <Plus className="h-5 w-5" /> Add scene
             </button>
           </div>
         </TabsContent>
 
-        <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto p-3">
-          <div className="space-y-2">
+        <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto p-8">
+          <div className="space-y-5">
             {cast.length === 0 && (
-              <EmptyHint icon={<Users className="h-4 w-4" />} text="No cast yet — ask the director to suggest characters." />
+              <EmptyHint icon={<Users className="h-8 w-8" />} text="No cast yet — ask the director to suggest characters." />
             )}
             {cast.map((c) => (
               <div
                 key={c.id}
-                className="flex gap-3 rounded-lg border border-border bg-card/40 p-2.5"
+                className="flex gap-5 rounded-2xl border border-border/60 bg-card/40 p-5"
               >
                 {c.ref ? (
                   <img
                     src={c.ref}
                     alt={c.name}
-                    className="h-16 w-16 shrink-0 rounded-md object-cover"
+                    className="h-20 w-20 shrink-0 rounded-2xl object-cover"
                   />
                 ) : (
-                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground/60">
-                    <Users className="h-5 w-5" />
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-muted text-muted-foreground/50">
+                    <Users className="h-7 w-7" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">{c.name}</div>
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-lg font-bold tracking-tight">{c.name}</div>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                       {c.role}
                     </span>
                   </div>
-                  <div className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-muted-foreground">
+                  <div className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
                     {c.notes}
                   </div>
                 </div>
               </div>
             ))}
-            <button className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-card/30 py-2 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground">
-              <ImagePlus className="h-3.5 w-3.5" /> Add character / reference
+            <button className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card/30 py-5 text-base font-semibold text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground">
+              <ImagePlus className="h-5 w-5" /> Add character / reference
             </button>
           </div>
         </TabsContent>
 
-        <TabsContent value="music" className="m-0 flex-1 overflow-y-auto p-3">
+        <TabsContent value="music" className="m-0 flex-1 overflow-y-auto p-8">
           {!music ? (
-            <EmptyHint icon={<Music2 className="h-4 w-4" />} text="No music brief yet — describe the vibe or tempo you want." />
+            <EmptyHint icon={<Music2 className="h-8 w-8" />} text="No music brief yet — describe the vibe or tempo you want." />
           ) : (
-          <div className="rounded-xl border border-border bg-card/40 p-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-lg bg-brand-gradient shadow-glow">
-                <Music2 className="h-5 w-5 text-primary-foreground" />
+          <div className="rounded-3xl border border-border/60 bg-card/40 p-6">
+            <div className="flex items-center gap-4">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-brand-gradient shadow-glow">
+                <Music2 className="h-7 w-7 text-primary-foreground" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{music.title || "Untitled track"}</div>
-                <div className="truncate text-[11px] text-muted-foreground">
+                <div className="text-lg font-bold tracking-tight">{music.title || "Untitled track"}</div>
+                <div className="truncate text-sm text-muted-foreground">
                   {music.artist || "—"}
                 </div>
               </div>
-              <Button variant="ghost" size="icon-sm">
-                <Play className="h-4 w-4" />
+              <Button variant="ghost" size="icon">
+                <Play className="h-5 w-5" />
               </Button>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
-              <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{music.bpm || "—"}</div>
-                <div className="text-muted-foreground">BPM</div>
+            <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-2xl bg-muted/60 py-4">
+                <div className="text-xl font-bold tracking-tight text-foreground">{music.bpm || "—"}</div>
+                <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">BPM</div>
               </div>
-              <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{music.key || "—"}</div>
-                <div className="text-muted-foreground">Key</div>
+              <div className="rounded-2xl bg-muted/60 py-4">
+                <div className="text-xl font-bold tracking-tight text-foreground">{music.key || "—"}</div>
+                <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Key</div>
               </div>
-              <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{music.duration ? formatDuration(music.duration) : "—"}</div>
-                <div className="text-muted-foreground">Length</div>
+              <div className="rounded-2xl bg-muted/60 py-4">
+                <div className="text-xl font-bold tracking-tight text-foreground">{music.duration ? formatDuration(music.duration) : "—"}</div>
+                <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Length</div>
               </div>
             </div>
-            <div className="mt-3">
-              <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="mt-6">
+              <div className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <span>Beat map</span>
                 <span>cuts auto-align</span>
               </div>
-              <div className="flex h-10 items-end gap-[2px]">
+              <div className="flex h-14 items-end gap-[2px]">
                 {Array.from({ length: 60 }).map((_, i) => {
                   const h = 20 + Math.abs(Math.sin(i * 0.7)) * 70 + (i % 4 === 0 ? 10 : 0);
                   return (
@@ -787,9 +786,11 @@ function StructurePanel({
 
 function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/20 px-4 py-10 text-center text-xs text-muted-foreground">
-      <div className="text-muted-foreground/70">{icon}</div>
-      <div className="max-w-[220px] leading-relaxed">{text}</div>
+    <div className="flex flex-col items-center justify-center gap-5 rounded-3xl border-2 border-dashed border-border/70 bg-card/20 px-6 py-20 text-center">
+      <div className="grid h-20 w-20 place-items-center rounded-3xl bg-muted/60 text-muted-foreground/60">
+        {icon}
+      </div>
+      <div className="max-w-[260px] text-base font-medium leading-relaxed text-muted-foreground">{text}</div>
     </div>
   );
 }
