@@ -7,13 +7,13 @@ export const Route = createFileRoute("/")({
   component: ConnectGate,
   head: () => ({
     meta: [
-      { title: "Reelable — Connect Pika to start creating" },
+      { title: "AI Video Director — Connect Pika to start creating" },
       {
         name: "description",
         content:
-          "Reelable is an AI video studio powered by Pika. Connect your Pika account to start generating cinematic clips with a director-grade chat workflow.",
+          "AI Video Director is an AI video studio powered by Pika. Connect your Pika account to start generating cinematic clips with a director-grade chat workflow.",
       },
-      { property: "og:title", content: "Reelable — Connect Pika to start creating" },
+      { property: "og:title", content: "AI Video Director — Connect Pika to start creating" },
       {
         property: "og:description",
         content:
@@ -117,7 +117,7 @@ function ConnectGate() {
       <section className="mx-auto flex max-w-3xl flex-col items-center px-6 pt-0 text-center">
         <img
           src={symbolLogo}
-          alt="Reelable symbol"
+          alt="AI Video Director symbol"
           className="my-16 h-[26px] w-auto brightness-0"
         />
         <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
