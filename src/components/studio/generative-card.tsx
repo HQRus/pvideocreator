@@ -228,10 +228,12 @@ export function GenerativeCard({
   html,
   onAnswer,
   disabled,
+  assets,
 }: {
   html: string;
   onAnswer: (answer: CardAnswer) => void;
   disabled?: boolean;
+  assets?: ProjectAsset[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const cleaned = stripProjectPatch(stripCardProse(stripCardWrapper(html)));
@@ -239,6 +241,20 @@ export function GenerativeCard({
 
   useEffect(() => {
     const root = ref.current;
+    if (root && assets && assets.length) {
+      // Swap any <img data-asset-ref="ast_xxx"> placeholders the model
+      // emits for real blob URLs from project state.
+      const map = new Map(assets.map((a) => [a.id, a]));
+      root
+        .querySelectorAll<HTMLImageElement>("img[data-asset-ref]")
+        .forEach((img) => {
+          const a = map.get(img.getAttribute("data-asset-ref") || "");
+          if (a) {
+            img.src = a.url;
+            img.alt = a.name;
+          }
+        });
+    }
     if (!root || disabled) return;
 
     // Track files attached to inputs in this card (form not yet submitted).
