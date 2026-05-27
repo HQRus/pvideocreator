@@ -84,8 +84,10 @@ export function GenerativeCard({
       const target = e.target as HTMLElement;
       const btn = target.closest<HTMLElement>('[data-action="answer"]');
       if (!btn || btn.tagName !== "BUTTON") return;
-      // ignore submit buttons inside forms — let the form handler take it
-      if (btn.closest("form")) return;
+      // Inside a form, only intercept explicit type="button" controls
+      // (e.g. "You decide for me"). Real submit buttons fall through to
+      // the form submit handler below.
+      if (btn.closest("form") && (btn as HTMLButtonElement).type !== "button") return;
       e.preventDefault();
       const value =
         btn.getAttribute("data-value") ?? btn.textContent?.trim() ?? "";
