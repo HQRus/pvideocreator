@@ -48,72 +48,60 @@ import {
   AssistantMessage,
   extractCardTitle,
   extractCardProse,
+  extractProjectPatch,
 } from "@/components/studio/generative-card";
-import sample1 from "@/assets/sample-1.jpg";
-import sample2 from "@/assets/sample-2.jpg";
-import sample3 from "@/assets/sample-3.jpg";
-import sample4 from "@/assets/sample-4.jpg";
+import {
+  INITIAL_PROJECT,
+  applyPatch,
+  type Character,
+  type Music,
+  type ProjectPatch,
+  type ProjectState,
+  type Scene,
+} from "@/lib/project-state";
 
 export const Route = createFileRoute("/studio")({
   component: Studio,
 });
 
-// ---------- sample structure data (would be persisted per-project) ----------
-
-type Scene = {
-  id: string;
-  n: number;
-  title: string;
-  prompt: string;
-  duration: number; // seconds
-  thumb: string;
-  status: "ready" | "drafting" | "rendering";
-};
-
-const INITIAL_SCENES: Scene[] = [
-  { id: "s1", n: 1, title: "Cold open — neon street", prompt: "Wide shot, rain-soaked Tokyo alley at midnight. Neon signs flicker. A lone figure walks toward camera, silhouette only.", duration: 6, thumb: sample1, status: "ready" },
-  { id: "s2", n: 2, title: "Close-up — the helmet", prompt: "Extreme close-up on a chrome motorcycle helmet, reflections of neon glide across the visor.", duration: 4, thumb: sample3, status: "ready" },
-  { id: "s3", n: 3, title: "Drift sequence", prompt: "Tracking shot, bike drifting around a wet corner, sparks. Slow motion, 60fps.", duration: 8, thumb: sample2, status: "rendering" },
-  { id: "s4", n: 4, title: "Skyline reveal", prompt: "Drone pull-back revealing the futuristic skyline. Camera rises through clouds.", duration: 6, thumb: sample4, status: "drafting" },
-  { id: "s5", n: 5, title: "Logo card", prompt: "Brand logo materializes from particles on black background. Subtle hum.", duration: 3, thumb: sample1, status: "drafting" },
-];
-
-const CHARACTERS = [
-  { id: "c1", name: "The Rider", role: "Protagonist", ref: sample3, notes: "Mid-20s, androgynous, chrome helmet, charcoal racing suit." },
-  { id: "c2", name: "The Voice", role: "Narrator (VO)", ref: sample2, notes: "Low warm female voice, intimate, slight reverb." },
-];
-
-const MUSIC = {
-  title: "Midnight Drift",
-  artist: "Generated · synthwave",
-  bpm: 96,
-  key: "F# minor",
-  beats: [0.0, 2.5, 5.0, 7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0],
-  duration: 27,
-};
-
 // ---------- page ----------
 
 function Studio() {
-  const [scenes, setScenes] = useState<Scene[]>(INITIAL_SCENES);
-  const [activeSceneId, setActiveSceneId] = useState<string>(scenes[0].id);
+  const [project, setProject] = useState<ProjectState>(INITIAL_PROJECT);
+  const [activeSceneId, setActiveSceneId] = useState<string>(
+    INITIAL_PROJECT.scenes[0]?.id ?? "",
+  );
+  const { scenes, cast, music, meta } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
+
+  const handlePatch = (patch: ProjectPatch) => {
+    setProject((prev) => applyPatch(prev, patch));
+  };
+
+  const setScenes = (next: Scene[]) =>
+    setProject((prev) => ({ ...prev, scenes: next }));
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
       <GalleryRail />
       <div className="flex min-w-0 flex-1 flex-col">
-        <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
+        <StudioTopBar
+          meta={meta}
+          duration={totalDuration}
+          sceneCount={scenes.length}
+        />
         <div className="flex-1 overflow-hidden border-t border-border/60">
           <ResizablePanelGroup orientation="horizontal" className="h-full">
             <ResizablePanel defaultSize={67} minSize={40} className="bg-sidebar/30">
-              <ChatPanel />
+              <ChatPanel onPatch={handlePatch} />
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={33} minSize={22}>
               <StructurePanel
                 scenes={scenes}
                 setScenes={setScenes}
+                cast={cast}
+                music={music}
                 activeSceneId={activeSceneId}
                 onSelect={setActiveSceneId}
                 totalDuration={totalDuration}
