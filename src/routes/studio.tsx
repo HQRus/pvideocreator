@@ -44,12 +44,14 @@ import {
   extractCardTitle,
   extractCardProse,
   extractProjectPatch,
+  type CardAnswer,
 } from "@/components/studio/generative-card";
 import {
   INITIAL_PROJECT,
   applyPatch,
   type Character,
   type Music,
+  type ProjectAsset,
   type ProjectPatch,
   type ProjectState,
   type Scene,
@@ -71,7 +73,7 @@ function Studio() {
     INITIAL_PROJECT.scenes[0]?.id ?? "",
   );
   const [panelOpen, setPanelOpen] = useState(true);
-  const { scenes, cast, music, meta } = project;
+  const { scenes, cast, music, meta, assets } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
   const handlePatch = (patch: ProjectPatch) => {
@@ -111,6 +113,7 @@ function Studio() {
             setScenes={setScenes}
             cast={cast}
             music={music}
+            assets={assets}
             activeSceneId={activeSceneId}
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
