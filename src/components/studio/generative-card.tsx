@@ -18,6 +18,19 @@ export function extractCardTitle(html: string): string {
   return m ? m[1] : "Card";
 }
 
+// Pulls the conversational AI prose out of the card so it can be rendered
+// in the chat history rather than inside the interactive surface.
+// The model is instructed to put it in <p data-prose>…</p>.
+export function extractCardProse(html: string): string {
+  const m = html.match(/<p[^>]*data-prose[^>]*>([\s\S]*?)<\/p>/i);
+  if (!m) return "";
+  return m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
+export function stripCardProse(html: string): string {
+  return html.replace(/<p[^>]*data-prose[^>]*>[\s\S]*?<\/p>/i, "");
+}
+
 export function stripCardWrapper(html: string): string {
   // strip a leading ```html fence or stray text the model may emit
   const fence = html.match(/```(?:html)?\s*([\s\S]*?)```/);
