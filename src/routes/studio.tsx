@@ -327,6 +327,11 @@ function ChatPanel() {
     }
   }
 
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, activeCard?.key, busy]);
+
   return (
     <div className="flex h-full flex-col">
       <Conversation className="flex-1">
