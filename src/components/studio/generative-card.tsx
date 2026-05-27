@@ -109,10 +109,11 @@ export function DecisionPill({
   answer: string;
 }) {
   return (
-    <div className="flex items-center gap-2 self-start rounded-full border border-border bg-muted/50 px-4 py-2 text-sm">
-      <span className="font-medium text-muted-foreground">{title}</span>
-      <span className="text-muted-foreground/60">·</span>
-      <span className="truncate text-foreground">{answer}</span>
+    <div className="ml-auto flex max-w-[80%] flex-col gap-1.5 self-end rounded-3xl bg-secondary px-5 py-3.5 text-foreground shadow-elegant">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </span>
+      <span className="text-base leading-snug">{answer}</span>
     </div>
   );
 }
