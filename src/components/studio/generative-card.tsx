@@ -50,7 +50,7 @@ export function GenerativeCard({
   disabled?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const cleaned = stripCardWrapper(html);
+  const cleaned = stripCardProse(stripCardWrapper(html));
   const safe = DOMPurify.sanitize(cleaned, SANITIZE_CONFIG);
 
   useEffect(() => {
