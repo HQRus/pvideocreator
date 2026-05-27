@@ -262,6 +262,9 @@ function StudioTopBar({
           </span>
         </div>
       </div>
+      <div className="pointer-events-auto absolute right-20 top-1/2 -translate-y-1/2">
+        <PikaConnectPill />
+      </div>
       <button
         onClick={onTogglePanel}
         className="pointer-events-auto absolute right-6 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -270,6 +273,79 @@ function StudioTopBar({
         {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </button>
     </header>
+  );
+}
+
+function PikaConnectPill() {
+  const [state, setState] = useState<"loading" | "disconnected" | "connecting" | "ready" | "error">("loading");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const refresh = async () => {
+    try {
+      const r = await fetch("/api/pika/status");
+      const j = (await r.json()) as { state?: string };
+      setState(j.state === "ready" ? "ready" : "disconnected");
+    } catch {
+      setState("error");
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const onConnect = async () => {
+    setState("connecting");
+    try {
+      const r = await fetch("/api/pika/connect", { method: "POST" });
+      const j = (await r.json()) as { state?: string; authUrl?: string };
+      if (j.state === "ready") { setState("ready"); return; }
+      if (j.authUrl) {
+        window.open(j.authUrl, "_blank", "noopener,noreferrer");
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = setInterval(async () => {
+          const s = await fetch("/api/pika/status").then((r) => r.json() as Promise<{ state?: string }>);
+          if (s.state === "ready") {
+            setState("ready");
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          }
+        }, 2000);
+      } else {
+        setState("error");
+      }
+    } catch {
+      setState("error");
+    }
+  };
+
+  const onDisconnect = async () => {
+    await fetch("/api/pika/disconnect", { method: "POST" });
+    setState("disconnected");
+  };
+
+  if (state === "ready") {
+    return (
+      <button
+        onClick={onDisconnect}
+        className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3.5 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/25"
+        title="Pika connected — click to disconnect"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        Pika
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={onConnect}
+      disabled={state === "connecting" || state === "loading"}
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-60"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+      {state === "connecting" ? "Connecting Pika…" : state === "loading" ? "…" : "Connect Pika"}
+    </button>
   );
 }
 
