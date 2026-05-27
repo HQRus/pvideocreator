@@ -118,7 +118,7 @@ function ConnectGate() {
         <img
           src={symbolLogo}
           alt="Reelable symbol"
-          className="mb-6 h-5 w-auto"
+          className="my-8 h-[26px] w-auto brightness-0"
         />
         <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
           AI Video Director Prototype
