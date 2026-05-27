@@ -653,7 +653,7 @@ function StructurePanel({
               { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
               { v: "scenes", icon: Film, label: "Scenes" },
               { v: "cast", icon: Users, label: "Cast" },
-              { v: "music", icon: Music2, label: "Music" },
+              { v: "music", icon: Music2, label: "Audio" },
             ].map(({ v, icon: Icon, label }) => (
               <TabsTrigger
                 key={v}
@@ -739,7 +739,7 @@ function StructurePanel({
 
         <TabsContent value="music" className="m-0 flex-1 overflow-y-auto p-8">
           {!music ? (
-            <EmptyHint icon={<Music2 className="h-8 w-8" />} text="No music brief yet — describe the vibe or tempo you want." />
+            <EmptyHint icon={<Music2 className="h-8 w-8" />} text="No audio yet — describe the music, voiceover, or sound design you want." />
           ) : (
           <div className="rounded-3xl border border-border/60 bg-card/40 p-6">
             <div className="flex items-center gap-4">
