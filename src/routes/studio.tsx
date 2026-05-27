@@ -566,22 +566,8 @@ function PreviewPanel({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
-            Storyboard
-          </span>
-          <span>·</span>
-          <span>Iteration 4</span>
-          <span className="text-muted-foreground/60">· auto-saved</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => setPlaying((p) => !p)}>
-            {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          </Button>
-          <Button variant="ghost" size="icon-sm">
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground" />
+        <div className="flex items-center gap-1" />
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -930,13 +916,13 @@ function StructurePanel({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
           <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-border/60 bg-background py-4 text-base font-bold tracking-tight text-foreground transition hover:border-foreground/40">
-            <Share2 className="h-4 w-4" /> Share
+            Share
           </button>
           <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-border/60 bg-background py-4 text-base font-bold tracking-tight text-foreground transition hover:border-foreground/40">
-            <Download className="h-4 w-4" /> Export
+            Export
           </button>
           <button className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95">
-            <Wand2 className="h-4 w-4" /> Render
+            Render
           </button>
         </div>
       </div>
