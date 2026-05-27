@@ -12,7 +12,6 @@ import {
   Users,
   Music2,
   Clock,
-  MoreHorizontal,
   GripVertical,
   Plus,
   ImagePlus,
@@ -31,10 +30,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Conversation,
   ConversationContent,
-  ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputTextarea,
