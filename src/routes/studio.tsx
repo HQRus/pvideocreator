@@ -656,7 +656,7 @@ function StructurePanel({
   totalDuration: number;
 }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
         <div className="border-b-2 border-border/40 px-8 pt-8 pb-0">
           <TabsList className="h-auto w-full justify-start gap-8 rounded-none bg-transparent p-0">
