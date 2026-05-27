@@ -45,6 +45,7 @@ import {
   GenerativeCard,
   DecisionPill,
   UserBubble,
+  AssistantMessage,
   extractCardTitle,
 } from "@/components/studio/generative-card";
 import sample1 from "@/assets/sample-1.jpg";
@@ -323,25 +324,26 @@ function ChatPanel() {
     <div className="flex h-full flex-col">
       <Conversation className="flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
-          {history.length === 0 && !activeCard ? (
-            <div className="flex h-full flex-col items-center justify-center gap-8 py-16 text-center">
-              <ReelableMark className="h-20 w-20" />
-              <h1 className="font-display text-5xl tracking-tight">
-                What are we making?
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Type one word below. I'll take it from there.
-              </p>
+          {history.length === 0 && !activeCard && !busy && (
+            <div className="flex flex-col items-start gap-6 pt-6">
+              <ReelableMark className="h-12 w-12" />
+              <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
             </div>
-          ) : (
-            history.map((it) =>
-              it.kind === "user" ? (
-                <UserBubble key={it.key} text={it.text} />
-              ) : (
-                <DecisionPill key={it.key} title={it.title} answer={it.answer} />
-              ),
-            )
           )}
+          {history.map((it) =>
+            it.kind === "user" ? (
+              <UserBubble key={it.key} text={it.text} />
+            ) : (
+              <DecisionPill key={it.key} title={it.title} answer={it.answer} />
+            ),
+          )}
+          {activeCard && (
+            <AssistantMessage
+              key={`q-${activeCard.key}`}
+              text={extractCardTitle(activeCard.html)}
+            />
+          )}
+          {busy && <Shimmer>Thinking…</Shimmer>}
           {error && (
             <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-5 py-3 text-sm text-destructive">
               {error.message ?? "Something went wrong with the AI gateway."}
@@ -354,11 +356,6 @@ function ChatPanel() {
       {/* Anchored composer: active card stacks directly above the input */}
       <div className="border-t border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-3xl px-8 pb-8 pt-6">
-          {busy && (
-            <div className="mb-4 rounded-3xl border border-border bg-card p-6 shadow-elegant">
-              <Shimmer>Designing the next step…</Shimmer>
-            </div>
-          )}
           {!busy && activeCard && (
             <div className="mb-4">
               <GenerativeCard

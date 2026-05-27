@@ -111,3 +111,11 @@ export function UserBubble({ text }: { text: string }) {
     </div>
   );
 }
+
+export function AssistantMessage({ text }: { text: string }) {
+  return (
+    <div className="max-w-[85%] self-start font-display text-2xl leading-snug tracking-tight text-foreground">
+      {text}
+    </div>
+  );
+}
