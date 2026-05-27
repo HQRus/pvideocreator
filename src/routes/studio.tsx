@@ -270,6 +270,8 @@ const STARTERS = [
 
 function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
   const [input, setInput] = useState("");
+  const [outgoing, setOutgoing] = useState<{ text: string; id: number } | null>(null);
+  const outgoingIdRef = useRef(0);
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
   });
@@ -280,6 +282,9 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput("");
+    const id = ++outgoingIdRef.current;
+    setOutgoing({ text: trimmed, id });
+    setTimeout(() => setOutgoing((o) => (o?.id === id ? null : o)), 650);
     await sendMessage({ text: trimmed });
   };
 
@@ -348,7 +353,7 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
   }, [messages.length, activeCard?.key, busy]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <Conversation className="flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
           <div className="flex flex-col items-start gap-6 pt-6">
@@ -427,6 +432,15 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
           </PromptInput>
         </div>
       </div>
+
+      {/* Flying pill: user's answer lifts off the composer and floats up into the transcript */}
+      {outgoing && (
+        <div className="pointer-events-none absolute bottom-28 left-1/2 z-50 -translate-x-1/2">
+          <div className="max-w-[18rem] animate-pill-fly overflow-hidden rounded-3xl bg-secondary px-5 py-3.5 text-base leading-snug text-foreground shadow-elegant">
+            {outgoing.text}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
