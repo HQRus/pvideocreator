@@ -114,7 +114,7 @@ function ConnectGate() {
 
       <header className="flex h-20 items-center px-8" />
 
-      <section className="mx-auto flex max-w-3xl flex-col items-center px-6 pt-24 text-center sm:pt-32">
+      <section className="mx-auto flex max-w-3xl flex-col items-center px-6 pt-0 text-center">
         <img
           src={symbolLogo}
           alt="Reelable symbol"
