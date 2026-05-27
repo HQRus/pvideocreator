@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/asset/$id")({
       GET: ({ params }) => {
         const a = getAsset(params.id);
         if (!a) return new Response("Not found", { status: 404 });
-        return new Response(a.bytes, {
+        return new Response(new Blob([a.bytes as BlobPart], { type: a.mime }), {
           status: 200,
           headers: {
             "Content-Type": a.mime,
