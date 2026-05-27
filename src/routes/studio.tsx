@@ -182,10 +182,10 @@ function FloatingGallery() {
             {GALLERY_PROJECTS.map((p) => (
               <button
                 key={p.id}
-                className={`flex items-center gap-3 rounded-2xl border p-2 text-left transition ${
+                className={`flex items-center gap-3 rounded-2xl p-2 text-left transition ${
                   p.active
-                    ? "border-primary/60 bg-card shadow-elegant"
-                    : "border-transparent hover:border-border hover:bg-card"
+                    ? "bg-muted/70"
+                    : "hover:bg-muted/40"
                 }`}
               >
                 <img
@@ -212,10 +212,8 @@ function FloatingGallery() {
               <div
                 key={p.id}
                 title={p.title}
-                className={`h-12 w-12 overflow-hidden rounded-xl border transition ${
-                  p.active
-                    ? "border-primary/60 shadow-glow"
-                    : "border-transparent hover:border-border"
+                className={`h-12 w-12 overflow-hidden rounded-xl transition ${
+                  p.active ? "opacity-100" : "opacity-70 hover:opacity-100"
                 }`}
               >
                 <img src={p.thumb} alt={p.title} className="h-full w-full object-cover" />
@@ -517,6 +515,7 @@ function ChatPanel({
             onSubmit={async (msg) => {
               await handleSend(msg.text ?? input);
             }}
+            className="[&_[role=group]]:border-transparent [&_[role=group]]:shadow-none [&_[role=group]]:has-[[data-slot=input-group-control]:focus-visible]:ring-0 [&_[role=group]]:has-[[data-slot=input-group-control]:focus-visible]:border-foreground/15"
           >
             <PromptInputTextarea
               autoFocus
@@ -898,10 +897,10 @@ function StructurePanel({
       {/* Floating sticky action bar */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-border/60 bg-background py-4 text-base font-bold tracking-tight text-foreground transition hover:border-foreground/40">
+          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
             Share
           </button>
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-border/60 bg-background py-4 text-base font-bold tracking-tight text-foreground transition hover:border-foreground/40">
+          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
             Export
           </button>
           <button className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95">
