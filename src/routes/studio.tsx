@@ -21,11 +21,6 @@ import {
   Maximize2,
   FolderOpen,
 } from "lucide-react";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Conversation,
@@ -75,6 +70,7 @@ function Studio() {
   const [activeSceneId, setActiveSceneId] = useState<string>(
     INITIAL_PROJECT.scenes[0]?.id ?? "",
   );
+  const [panelOpen, setPanelOpen] = useState(true);
   const { scenes, cast, music, meta } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
@@ -86,21 +82,26 @@ function Studio() {
     setProject((prev) => ({ ...prev, scenes: next }));
 
   return (
-    <div className="flex h-screen w-full bg-background text-foreground">
-      <GalleryRail />
+    <div className="relative flex h-screen w-full overflow-hidden bg-background text-foreground">
+      <FloatingGallery />
       <div className="flex min-w-0 flex-1 flex-col">
         <StudioTopBar
           meta={meta}
           duration={totalDuration}
           sceneCount={scenes.length}
+          panelOpen={panelOpen}
+          onTogglePanel={() => setPanelOpen((o) => !o)}
         />
-        <div className="flex-1 overflow-hidden border-t border-border/60">
-          <ResizablePanelGroup orientation="horizontal" className="h-full">
-            <ResizablePanel defaultSize={67} minSize={40} className="bg-sidebar/30">
-              <ChatPanel onPatch={handlePatch} />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={33} minSize={22}>
+        <div className="flex min-h-0 flex-1 border-t border-border/60">
+          <div className="min-w-0 flex-1 bg-sidebar/30">
+            <ChatPanel onPatch={handlePatch} />
+          </div>
+          <aside
+            className={`shrink-0 overflow-hidden border-l border-border/60 bg-background transition-[width] duration-300 ease-out ${
+              panelOpen ? "w-[440px]" : "w-0"
+            }`}
+          >
+            <div className="h-full w-[440px]">
               <StructurePanel
                 scenes={scenes}
                 setScenes={setScenes}
@@ -110,10 +111,20 @@ function Studio() {
                 onSelect={setActiveSceneId}
                 totalDuration={totalDuration}
               />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+            </div>
+          </aside>
         </div>
       </div>
+
+      {!panelOpen && (
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="absolute right-4 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant transition hover:text-foreground"
+          aria-label="Open project panel"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
