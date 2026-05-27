@@ -8,6 +8,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
+import { putAsset, base64ToBytes } from "@/lib/asset-cache.server";
 
 // ---------- Tool implementations ----------
 
@@ -18,7 +19,7 @@ const nextToolAssetId = () =>
 async function gatewayGenerateImage(
   prompt: string,
   apiKey: string,
-): Promise<{ url: string; mime: string }> {
+): Promise<{ b64: string; mime: string }> {
   const res = await fetch(
     "https://ai.gateway.lovable.dev/v1/images/generations",
     {
@@ -28,11 +29,11 @@ async function gatewayGenerateImage(
         "Lovable-API-Key": apiKey,
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-image-preview",
+        model: "openai/gpt-image-2",
         prompt,
         n: 1,
         size: "1024x1024",
-        response_format: "b64_json",
+        quality: "low",
       }),
     },
   );
@@ -44,9 +45,8 @@ async function gatewayGenerateImage(
   };
   const first = data.data?.[0];
   if (first?.b64_json) {
-    return { url: `data:image/png;base64,${first.b64_json}`, mime: "image/png" };
+    return { b64: first.b64_json, mime: "image/png" };
   }
-  if (first?.url) return { url: first.url, mime: "image/png" };
   throw new Error("Image gateway returned no image");
 }
 
@@ -436,13 +436,18 @@ export const Route = createFileRoute("/api/chat")({
             }),
             execute: async ({ prompt, kind, label }) => {
               try {
-                const { url, mime } = await gatewayGenerateImage(prompt, key);
+                const { b64, mime } = await gatewayGenerateImage(prompt, key);
+                const id = nextToolAssetId();
+                // Stash bytes server-side; only stream a short URL through
+                // the model context (base64 in tool results blows past the
+                // token limit on the next step).
+                putAsset(id, mime, base64ToBytes(b64));
                 return {
-                  id: nextToolAssetId(),
+                  id,
                   kind: kind ?? "reference",
                   mime,
                   name: (label ?? prompt.slice(0, 40)) + ".png",
-                  url,
+                  url: `/api/asset/${id}`,
                   label,
                 };
               } catch (err) {
