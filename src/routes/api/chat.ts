@@ -434,7 +434,7 @@ export const Route = createFileRoute("/api/chat")({
         const gateway = createLovableAiGatewayProvider(key);
         const model = gateway("google/gemini-3-flash-preview");
 
-        const tools = {
+        const tools: Record<string, unknown> = {
           generate_image: tool({
             description:
               "Generate a single reference image (mood, character, scene, logo). Returns an asset descriptor already attached to project state.",
@@ -497,7 +497,7 @@ export const Route = createFileRoute("/api/chat")({
               return { ok: true, patch };
             },
           }),
-        } as Record<string, ReturnType<typeof tool>>;
+        };
 
         // Merge in Pika MCP tools if the workspace has an active connection.
         let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
@@ -507,7 +507,7 @@ export const Route = createFileRoute("/api/chat")({
             pikaClient = await openPikaMCPClient(redirectUri);
             const pikaTools = await pikaClient.tools();
             for (const [name, t] of Object.entries(pikaTools)) {
-              tools[`pika_${name}`] = t as ReturnType<typeof tool>;
+              tools[`pika_${name}`] = t;
             }
           }
         } catch (err) {
@@ -521,7 +521,7 @@ export const Route = createFileRoute("/api/chat")({
         const result = streamText({
           model,
           system: SYSTEM_PROMPT,
-          tools,
+          tools: tools as never,
           stopWhen: stepCountIs(50),
           messages: await convertToModelMessages(messages as UIMessage[]),
           onFinish: async () => {
