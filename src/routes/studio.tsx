@@ -241,13 +241,16 @@ function ChatPanel() {
             <ConversationEmptyState
               className="gap-6 px-4 py-12"
               icon={<ReelableMark className="h-14 w-14" />}
-              title={
-                <span className="font-display text-3xl tracking-tight">
-                  What are we making?
-                </span>
-              }
+              title="What are we making?"
               description="Type one word. I'll do the rest."
             >
+              <ReelableMark className="h-16 w-16" />
+              <h3 className="font-display text-3xl tracking-tight">
+                What are we making?
+              </h3>
+              <p className="text-base text-muted-foreground">
+                Type one word. I'll do the rest.
+              </p>
               <div className="mt-6 flex w-full flex-col gap-2.5">
                 {STARTERS.map((s) => (
                   <button
