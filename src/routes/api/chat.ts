@@ -122,6 +122,10 @@ Examples of when to patch (do not wait for "enough" info):
 - Turn 1, user says "music video for my song" → patch meta.format="Music video".
   If they give a working title or vibe word, patch meta.title too.
 - User picks 9:16 → patch meta.aspectRatio immediately.
+- User mentions length ("30 second", "2 minute", "short") → patch
+  meta.targetDuration with a short human string ("30s", "2 min").
+- User mentions frame rate or resolution → patch meta.fps ("24", "30", "60")
+  and/or meta.resolution ("1080p", "4K").
 - User picks an energy/genre tile → patch music.title or music with a one-line
   brief capturing that vibe (artist can stay "" until known).
 - User mentions BPM, key, length, or a reference track → patch music.bpm /
