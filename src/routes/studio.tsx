@@ -279,6 +279,43 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// Deep-walk a Pika MCP tool result looking for video URLs. MCP responses
+// usually arrive as { content: [{ type: "text", text: "..." }, ...] } and
+// may also include structuredContent. We accept any http(s) URL with a
+// video-ish extension or path hint.
+function extractVideoAssets(out: unknown): ProjectAsset[] {
+  const urls = new Set<string>();
+  const visit = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const re = /https?:\/\/[^\s"'<>)]+/g;
+      const matches = v.match(re);
+      if (matches) {
+        for (const u of matches) {
+          if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u) || /pika|video|cdn/i.test(u)) {
+            if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) urls.add(u);
+          }
+        }
+      }
+      return;
+    }
+    if (Array.isArray(v)) { v.forEach(visit); return; }
+    if (typeof v === "object") {
+      for (const val of Object.values(v as Record<string, unknown>)) visit(val);
+    }
+  };
+  visit(out);
+  let i = 0;
+  return Array.from(urls).map((url) => ({
+    id: `ast_pika_${Date.now().toString(36)}_${i++}`,
+    kind: "video" as const,
+    mime: /\.webm/i.test(url) ? "video/webm" : "video/mp4",
+    name: url.split("/").pop()?.split("?")[0] || "pika-clip.mp4",
+    url,
+    label: "Pika clip",
+  }));
+}
+
 // ---------- chat panel ----------
 
 const STARTERS = [
