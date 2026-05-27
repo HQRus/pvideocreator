@@ -244,14 +244,18 @@ function StudioTopBar({
   onTogglePanel: () => void;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 pl-24 pr-4">
-      <div className="flex items-center gap-3">
-        <Link to="/" className="text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-        <ReelableMark className="h-7 w-7" />
-        <div className="flex flex-col leading-tight">
-          <span className="text-sm font-medium">{meta.title}</span>
+    <header className="pointer-events-none relative z-20 flex h-16 shrink-0 items-center justify-center px-4">
+      <Link
+        to="/"
+        className="pointer-events-auto absolute left-24 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label="Back home"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Link>
+      <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-card px-5 py-2 shadow-elegant">
+        <ReelableMark className="h-6 w-6" />
+        <div className="flex items-baseline gap-2 leading-tight">
+          <span className="text-sm font-semibold tracking-tight">{meta.title}</span>
           <span className="text-[11px] text-muted-foreground">
             {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
           </span>
@@ -259,7 +263,7 @@ function StudioTopBar({
       </div>
       <button
         onClick={onTogglePanel}
-        className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="pointer-events-auto absolute right-6 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
         aria-label={panelOpen ? "Collapse project panel" : "Open project panel"}
       >
         {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
