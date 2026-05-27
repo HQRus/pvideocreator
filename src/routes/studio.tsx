@@ -18,7 +18,9 @@ import {
   ImagePlus,
   Wand2,
   ChevronLeft,
+  ChevronRight,
   Maximize2,
+  FolderOpen,
 } from "lucide-react";
 import {
   ResizablePanelGroup,
@@ -99,26 +101,124 @@ function Studio() {
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
-      <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
-      <div className="flex-1 overflow-hidden border-t border-border/60">
-        <ResizablePanelGroup orientation="horizontal" className="h-full">
-          <ResizablePanel defaultSize={42} minSize={28} className="bg-sidebar/40">
-            <ChatPanel />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={58} minSize={40}>
-            <StructurePanel
-              scenes={scenes}
-              setScenes={setScenes}
-              activeSceneId={activeSceneId}
-              onSelect={setActiveSceneId}
-              totalDuration={totalDuration}
-            />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+    <div className="flex h-screen w-full bg-background text-foreground">
+      <GalleryRail />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <StudioTopBar duration={totalDuration} sceneCount={scenes.length} />
+        <div className="flex-1 overflow-hidden border-t border-border/60">
+          <ResizablePanelGroup orientation="horizontal" className="h-full">
+            <ResizablePanel defaultSize={67} minSize={40} className="bg-sidebar/30">
+              <ChatPanel />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={33} minSize={22}>
+              <StructurePanel
+                scenes={scenes}
+                setScenes={setScenes}
+                activeSceneId={activeSceneId}
+                onSelect={setActiveSceneId}
+                totalDuration={totalDuration}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       </div>
     </div>
+  );
+}
+
+// ---------- gallery rail (left, projects) ----------
+
+const GALLERY_PROJECTS = [
+  { id: "p1", title: "Neon Drift", meta: "Music video · 9:16", thumb: sample1, active: true },
+  { id: "p2", title: "Coastline", meta: "Short film · 16:9", thumb: sample2 },
+  { id: "p3", title: "Powder Run", meta: "Sports edit · 9:16", thumb: sample3 },
+  { id: "p4", title: "Atelier", meta: "Brand spot · 1:1", thumb: sample4 },
+  { id: "p5", title: "Late Bloom", meta: "Music video · 9:16", thumb: sample2 },
+];
+
+function GalleryRail() {
+  const [open, setOpen] = useState(false);
+  return (
+    <aside
+      className={`relative flex h-full shrink-0 flex-col border-r border-border/60 bg-sidebar/60 transition-all duration-300 ${
+        open ? "w-72" : "w-16"
+      }`}
+    >
+      <div className="flex h-14 items-center justify-between px-3">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label={open ? "Collapse gallery" : "Expand gallery"}
+        >
+          {open ? <ChevronLeft className="h-4 w-4" /> : <FolderOpen className="h-4 w-4" />}
+        </button>
+        {open && (
+          <span className="font-display text-base tracking-tight">Gallery</span>
+        )}
+        {open && (
+          <button className="grid h-9 w-9 place-items-center rounded-full bg-brand-gradient text-primary-foreground shadow-glow hover:opacity-95">
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
+        {open ? (
+          <div className="flex flex-col gap-2">
+            {GALLERY_PROJECTS.map((p) => (
+              <button
+                key={p.id}
+                className={`flex items-center gap-3 rounded-2xl border p-2 text-left transition ${
+                  p.active
+                    ? "border-primary/60 bg-card shadow-elegant"
+                    : "border-transparent hover:border-border hover:bg-card"
+                }`}
+              >
+                <img
+                  src={p.thumb}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{p.title}</div>
+                  <div className="truncate text-xs text-muted-foreground">{p.meta}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            {GALLERY_PROJECTS.map((p) => (
+              <button
+                key={p.id}
+                title={p.title}
+                className={`h-12 w-12 overflow-hidden rounded-xl border transition ${
+                  p.active
+                    ? "border-primary/60 shadow-glow"
+                    : "border-transparent hover:border-border"
+                }`}
+              >
+                <img src={p.thumb} alt={p.title} className="h-full w-full object-cover" />
+              </button>
+            ))}
+            <button className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground">
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="absolute -right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant hover:text-foreground"
+          aria-label="Expand gallery"
+        >
+          <ChevronRight className="h-3 w-3" />
+        </button>
+      )}
+    </aside>
   );
 }
 
