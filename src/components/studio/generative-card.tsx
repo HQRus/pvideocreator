@@ -94,7 +94,7 @@ export function GenerativeCard({
   return (
     <div
       ref={ref}
-      className="generative-card w-full rounded-3xl border border-border bg-card p-6 text-base leading-relaxed shadow-elegant sm:p-8"
+      className="generative-card animate-card-pop w-full rounded-3xl border border-border bg-card p-6 text-base leading-relaxed shadow-elegant sm:p-8"
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: safe }}
     />
