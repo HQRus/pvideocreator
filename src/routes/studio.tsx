@@ -310,6 +310,16 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
     await sendMessage({ text: trimmed });
   };
 
+  // Card answers can also carry uploaded assets. Patch them into project
+  // state immediately so the panel reflects the upload, then send a
+  // human-readable summary to the model (with asset ids it can reference).
+  const handleCardAnswer = async (answer: CardAnswer) => {
+    if (answer.assets.length) {
+      onPatch({ assetsAppend: answer.assets });
+    }
+    await handleSend(answer.summary);
+  };
+
   const textOf = (m: UIMessage) =>
     m.parts
       .map((p) => (p.type === "text" ? p.text : ""))
