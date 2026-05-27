@@ -47,6 +47,7 @@ import {
   UserBubble,
   AssistantMessage,
   extractCardTitle,
+  extractCardProse,
 } from "@/components/studio/generative-card";
 import sample1 from "@/assets/sample-1.jpg";
 import sample2 from "@/assets/sample-2.jpg";
@@ -340,7 +341,10 @@ function ChatPanel() {
           {activeCard && (
             <AssistantMessage
               key={`q-${activeCard.key}`}
-              text={extractCardTitle(activeCard.html)}
+              text={
+                extractCardProse(activeCard.html) ||
+                extractCardTitle(activeCard.html)
+              }
             />
           )}
           {busy && <Shimmer>Thinking…</Shimmer>}
