@@ -151,7 +151,10 @@ Patch schema (every field optional, omit what you're not changing):
     "title": string,
     "format": string,
     "aspectRatio": "9:16"|"16:9"|"1:1"|"4:5",
-    "logline": string
+    "logline": string,
+    "targetDuration": string,
+    "fps": string,
+    "resolution": string
   },
   "scenes": [ { "n": number, "title": string, "prompt": string, "duration": number } ],
   "scenesAppend": [ ...same shape, appended to existing scenes ],
