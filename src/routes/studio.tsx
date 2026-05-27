@@ -382,6 +382,10 @@ function ChatPanel({
           onPatch({ assetsAppend: out.assets });
         } else if (p.type === "tool-commit_project_patch" && out.patch) {
           onPatch(out.patch as ProjectPatch);
+        } else if (p.type.startsWith("tool-pika_")) {
+          // Sweep Pika MCP tool outputs for video URLs and attach them.
+          const videos = extractVideoAssets(out);
+          if (videos.length) onPatch({ assetsAppend: videos });
         }
       }
     }
