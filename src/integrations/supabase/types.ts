@@ -14,7 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      pika_connections: {
+        Row: {
+          client_information: Json | null
+          code_verifier: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          oauth_state: string | null
+          server_url: string
+          tokens: Json | null
+          updated_at: string
+        }
+        Insert: {
+          client_information?: Json | null
+          code_verifier?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          oauth_state?: string | null
+          server_url: string
+          tokens?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          client_information?: Json | null
+          code_verifier?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          oauth_state?: string | null
+          server_url?: string
+          tokens?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
