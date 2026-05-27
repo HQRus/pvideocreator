@@ -45,6 +45,7 @@ import {
   GenerativeCard,
   DecisionPill,
   UserBubble,
+  AssistantMessage,
   extractCardTitle,
 } from "@/components/studio/generative-card";
 import sample1 from "@/assets/sample-1.jpg";
