@@ -1,6 +1,100 @@
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  tool,
+  type UIMessage,
+} from "ai";
+import { z } from "zod";
+
+// ---------- Tool implementations ----------
+
+let _toolAssetCounter = 0;
+const nextToolAssetId = () =>
+  `ast_t${Date.now().toString(36)}${(++_toolAssetCounter).toString(36)}`;
+
+async function gatewayGenerateImage(
+  prompt: string,
+  apiKey: string,
+): Promise<{ url: string; mime: string }> {
+  const res = await fetch(
+    "https://ai.gateway.lovable.dev/v1/images/generations",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Lovable-API-Key": apiKey,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-pro-image-preview",
+        prompt,
+        n: 1,
+        size: "1024x1024",
+        response_format: "b64_json",
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Image gateway error ${res.status}: ${await res.text()}`);
+  }
+  const data = (await res.json()) as {
+    data?: Array<{ b64_json?: string; url?: string }>;
+  };
+  const first = data.data?.[0];
+  if (first?.b64_json) {
+    return { url: `data:image/png;base64,${first.b64_json}`, mime: "image/png" };
+  }
+  if (first?.url) return { url: first.url, mime: "image/png" };
+  throw new Error("Image gateway returned no image");
+}
+
+const STOCK_LIBRARY: Array<{ tags: string[]; url: string; label: string }> = [
+  {
+    tags: ["city", "skyline", "night", "neon", "urban"],
+    url: "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=1200",
+    label: "Neon city skyline at night",
+  },
+  {
+    tags: ["car", "drift", "road", "speed", "highway"],
+    url: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200",
+    label: "Car on open road",
+  },
+  {
+    tags: ["portrait", "face", "person", "studio"],
+    url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=1200",
+    label: "Studio portrait",
+  },
+  {
+    tags: ["nature", "forest", "trees", "mist", "landscape"],
+    url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200",
+    label: "Misty forest",
+  },
+  {
+    tags: ["studio", "interior", "warehouse"],
+    url: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200",
+    label: "Open studio interior",
+  },
+];
+
+function searchStock(query: string, limit: number) {
+  const q = query.toLowerCase();
+  const scored = STOCK_LIBRARY.map((s) => ({
+    s,
+    score: s.tags.reduce((acc, t) => acc + (q.includes(t) ? 1 : 0), 0),
+  }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(1, Math.min(limit, 4)));
+  return scored.map(({ s }) => ({
+    id: nextToolAssetId(),
+    kind: "reference" as const,
+    mime: "image/jpeg",
+    name: `${s.label}.jpg`,
+    url: s.url,
+    label: s.label,
+  }));
+}
 
 const SYSTEM_PROMPT = `You are Reelable, an AI video director. You DO NOT respond with prose or markdown.
 Instead, every reply is ONE interactive HTML card that either asks the user the next most important
@@ -276,6 +370,33 @@ open a separate describe-it UI.
 - Always set data-card-title to a short noun phrase ("Energy", "Cast", "Storyboard v1") —
   this is what shows in the collapsed history pill.
 - Never repeat a question already answered. Read the conversation and move forward.
+
+════════ TOOLS YOU CAN CALL ════════
+You may call tools mid-turn before emitting the final HTML card. After each
+tool returns, you MUST eventually emit ONE card as your final assistant
+message. The card is the user-facing response; tool results alone are not.
+
+- generate_image({ prompt, kind?, label? }) → asset descriptor
+  Generate a visual reference (likeness sketch, scene concept, logo idea,
+  storyboard frame, mood image). The runtime auto-attaches the returned
+  asset to project state. Reference it in your card with
+  <img data-asset-ref="ast_xxx" class="..." />.
+  Use it any time a picture is faster than a paragraph — confirming a
+  vibe, sketching a character, generating a placeholder anchor desk while
+  the user uploads their selfie.
+
+- search_stock_media({ query, limit? }) → { assets: [...] }
+  Find ready-to-use stock references. Same asset shape, also auto-attached.
+  Cheaper than generate_image — use for mood boards.
+
+- commit_project_patch({ patch }) → { ok: true }
+  Apply a project patch programmatically (same schema as the
+  <script data-project-patch> block). Prefer this when you are also calling
+  another tool in the same turn — keeps state updates atomic.
+
+Etiquette: at most 3 tool calls per turn. Tool-generated assets are already
+in project state — do NOT also list them in assetsAppend, just reference
+them by id.
 `;
 
 type ChatRequestBody = { messages?: unknown };
@@ -293,9 +414,72 @@ export const Route = createFileRoute("/api/chat")({
 
         const gateway = createLovableAiGatewayProvider(key);
         const model = gateway("google/gemini-3-flash-preview");
+
+        const tools = {
+          generate_image: tool({
+            description:
+              "Generate a single reference image (mood, character, scene, logo). Returns an asset descriptor already attached to project state.",
+            inputSchema: z.object({
+              prompt: z.string().min(3).max(800),
+              kind: z
+                .enum([
+                  "likeness",
+                  "logo",
+                  "reference",
+                  "voice",
+                  "audio",
+                  "video",
+                  "other",
+                ])
+                .optional(),
+              label: z.string().max(120).optional(),
+            }),
+            execute: async ({ prompt, kind, label }) => {
+              try {
+                const { url, mime } = await gatewayGenerateImage(prompt, key);
+                return {
+                  id: nextToolAssetId(),
+                  kind: kind ?? "reference",
+                  mime,
+                  name: (label ?? prompt.slice(0, 40)) + ".png",
+                  url,
+                  label,
+                };
+              } catch (err) {
+                return {
+                  error: err instanceof Error ? err.message : String(err),
+                };
+              }
+            },
+          }),
+          search_stock_media: tool({
+            description:
+              "Search a curated library of stock reference images. Returns 1–4 asset descriptors already attached to project state.",
+            inputSchema: z.object({
+              query: z.string().min(2).max(120),
+              limit: z.number().int().min(1).max(4).optional(),
+            }),
+            execute: async ({ query, limit }) => {
+              return { assets: searchStock(query, limit ?? 2) };
+            },
+          }),
+          commit_project_patch: tool({
+            description:
+              "Apply a project patch (same schema as the <script data-project-patch> block) programmatically.",
+            inputSchema: z.object({
+              patch: z.record(z.string(), z.unknown()),
+            }),
+            execute: async ({ patch }) => {
+              return { ok: true, patch };
+            },
+          }),
+        };
+
         const result = streamText({
           model,
           system: SYSTEM_PROMPT,
+          tools,
+          stopWhen: stepCountIs(50),
           messages: await convertToModelMessages(messages as UIMessage[]),
         });
 

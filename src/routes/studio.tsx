@@ -332,16 +332,64 @@ function ChatPanel({
       .join("")
       .trim();
 
+  // Walk message parts looking for tool results. Each AI SDK tool part has
+  // type "tool-<name>" with { state, toolCallId, input, output }.
+  type ToolPart = {
+    type: string;
+    state?: string;
+    toolCallId?: string;
+    output?: unknown;
+    input?: unknown;
+  };
+  const toolPartsOf = (m: UIMessage): ToolPart[] =>
+    (m.parts as unknown as ToolPart[]).filter((p) =>
+      typeof p.type === "string" && p.type.startsWith("tool-"),
+    );
+
+  // Pending tool calls in the in-flight assistant message (for the shimmer).
+  const pendingTools: string[] = [];
+  const last = messages[messages.length - 1];
+  if (last && last.role === "assistant" && busy) {
+    for (const p of toolPartsOf(last)) {
+      if (p.state !== "output-available" && p.state !== "output-error") {
+        const name = p.type.replace(/^tool-/, "");
+        pendingTools.push(name);
+      }
+    }
+  }
+
   // Apply project patches embedded in any assistant message exactly once.
   const appliedPatchIds = useRef<Set<string>>(new Set());
+  const appliedToolCallIds = useRef<Set<string>>(new Set());
   useEffect(() => {
     for (const m of messages) {
       if (m.role !== "assistant") continue;
-      if (appliedPatchIds.current.has(m.id)) continue;
-      const patch = extractProjectPatch(textOf(m));
-      if (patch) {
-        appliedPatchIds.current.add(m.id);
-        onPatch(patch as ProjectPatch);
+      // 1) Hidden script patches in the card HTML.
+      if (!appliedPatchIds.current.has(m.id)) {
+        const patch = extractProjectPatch(textOf(m));
+        if (patch) {
+          appliedPatchIds.current.add(m.id);
+          onPatch(patch as ProjectPatch);
+        }
+      }
+      // 2) Tool results: auto-attach generated/stock assets and apply
+      //    commit_project_patch outputs.
+      for (const p of toolPartsOf(m)) {
+        if (p.state !== "output-available") continue;
+        const callId = p.toolCallId ?? "";
+        if (!callId || appliedToolCallIds.current.has(callId)) continue;
+        appliedToolCallIds.current.add(callId);
+        const out = p.output as
+          | { error?: string; id?: string; url?: string; assets?: ProjectAsset[]; patch?: unknown }
+          | undefined;
+        if (!out || out.error) continue;
+        if (p.type === "tool-generate_image" && out.id && out.url) {
+          onPatch({ assetsAppend: [out as ProjectAsset] });
+        } else if (p.type === "tool-search_stock_media" && Array.isArray(out.assets)) {
+          onPatch({ assetsAppend: out.assets });
+        } else if (p.type === "tool-commit_project_patch" && out.patch) {
+          onPatch(out.patch as ProjectPatch);
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -404,7 +452,14 @@ function ChatPanel({
             ) : it.kind === "assistant" ? (
               <AssistantMessage key={it.key} text={it.text} />
             ) : (
-              <DecisionPill key={it.key} title={it.title} answer={it.answer} />
+              <DecisionPill
+                key={it.key}
+                title={it.title}
+                answer={it.answer}
+                onRevise={() =>
+                  handleSend(`Let's revise "${it.title}" — show me that card again.`)
+                }
+              />
             ),
           )}
           {activeCard && (
@@ -416,7 +471,17 @@ function ChatPanel({
               }
             />
           )}
-          {busy && <Shimmer>Thinking…</Shimmer>}
+          {busy && (
+            <Shimmer>
+              {pendingTools.length
+                ? pendingTools[0] === "generate_image"
+                  ? "Generating an image…"
+                  : pendingTools[0] === "search_stock_media"
+                    ? "Searching references…"
+                    : "Working…"
+                : "Thinking…"}
+            </Shimmer>
+          )}
           {error && (
             <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-5 py-3 text-sm text-destructive">
               {error.message ?? "Something went wrong with the AI gateway."}
