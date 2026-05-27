@@ -867,6 +867,50 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
+function TechSpecs({
+  meta,
+  totalDuration,
+  sceneCount,
+}: {
+  meta: {
+    aspectRatio: string;
+    targetDuration: string;
+    fps: string;
+    resolution: string;
+  };
+  totalDuration: number;
+  sceneCount: number;
+}) {
+  const clean = (v: string) => (v && v !== "—" ? v : "");
+  const length =
+    clean(meta.targetDuration) ||
+    (totalDuration > 0 ? formatDuration(totalDuration) : "");
+  const specs: { label: string; value: string }[] = [
+    { label: "Aspect", value: clean(meta.aspectRatio) || "—" },
+    { label: "Length", value: length || "—" },
+    { label: "Scenes", value: sceneCount > 0 ? String(sceneCount) : "—" },
+    { label: "FPS", value: clean(meta.fps) || "—" },
+    { label: "Resolution", value: clean(meta.resolution) || "—" },
+  ];
+  return (
+    <div className="mt-5 flex flex-wrap gap-2">
+      {specs.map((s) => (
+        <div
+          key={s.label}
+          className="flex items-baseline gap-1.5 rounded-full bg-muted/60 px-3 py-1.5"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            {s.label}
+          </span>
+          <span className="text-xs font-semibold tracking-tight text-foreground">
+            {s.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SceneRow({
   scene,
   active,
