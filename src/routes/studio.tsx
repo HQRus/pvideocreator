@@ -665,6 +665,7 @@ function StructurePanel({
   setScenes,
   cast,
   music,
+  assets,
   activeSceneId,
   onSelect,
   totalDuration,
@@ -682,6 +683,7 @@ function StructurePanel({
   setScenes: (s: Scene[]) => void;
   cast: Character[];
   music: Music;
+  assets: ProjectAsset[];
   activeSceneId: string;
   onSelect: (id: string) => void;
   totalDuration: number;
