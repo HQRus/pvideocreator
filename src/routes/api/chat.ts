@@ -78,9 +78,21 @@ The card MUST contain at least one interactive control so the user can answer.
        <span class="text-sm text-muted-foreground">One-line concept</span>
        <textarea name="concept" rows="3" class="rounded-2xl border border-border bg-card px-5 py-4 text-base"></textarea>
      </label>
-     <button type="submit" class="self-end rounded-full bg-brand-gradient px-6 py-3 text-base font-medium text-primary-foreground shadow-glow">Continue</button>
+     <div class="flex flex-wrap items-center justify-end gap-3">
+       <button type="button" data-action="answer" data-value="You decide for me" class="rounded-full border border-border px-5 py-3 text-base hover:bg-muted">You decide</button>
+       <button type="submit" class="rounded-full bg-brand-gradient px-6 py-3 text-base font-medium text-primary-foreground shadow-glow">Continue</button>
+     </div>
      </form>
    </div>
+
+   IMPORTANT: ANY card that asks the user to type text — a form with inputs,
+   a single textarea, a naming prompt (character names, titles, taglines,
+   lyrics, prompts, descriptions) — MUST include a secondary
+   <button type="button" data-action="answer" data-value="You decide for me">You decide</button>
+   next to the submit button. This lets the user delegate the decision back
+   to you. When you receive "You decide for me" as the answer, make a
+   confident creative choice yourself, commit it via a project patch, and
+   move on to the next decision — do NOT re-ask the same question.
 
 3) PROJECT-ARTIFACT HANDOFF (when you've drafted something concrete like a
    storyboard, cast list, music brief, or shot list):
