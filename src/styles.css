@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -62,7 +63,7 @@
 }
 
 :root {
-  --radius: 0.875rem;
+  --radius: 1.25rem;
   /* Warm light theme — Pika-inspired cream + soft yellow + lavender */
   --background: oklch(0.985 0.008 85);            /* warm off-white #FAF8F3 */
   --foreground: oklch(0.18 0.01 60);              /* near-black */
@@ -128,7 +129,12 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-feature-settings: "ss01", "cv11";
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .font-display {
+    font-family: "Archivo Black", "Inter", sans-serif;
+    letter-spacing: -0.01em;
   }
 }
 
