@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import symbolLogo from "@/assets/symbol.svg";
 import {
   Play,
   Pause,
@@ -246,7 +247,7 @@ function StudioTopBar({
   onTogglePanel: () => void;
 }) {
   return (
-    <header className="pointer-events-none relative z-20 flex h-16 shrink-0 items-center justify-center px-4">
+    <header className="pointer-events-none relative z-20 flex shrink-0 justify-center px-4 py-3">
       <Link
         to="/studio"
         className="pointer-events-auto absolute left-80 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -254,13 +255,16 @@ function StudioTopBar({
       >
         <ChevronLeft className="h-4 w-4" />
       </Link>
-      <div className="pointer-events-auto flex items-center gap-3.5 rounded-full bg-foreground px-6 py-2.5 shadow-elegant">
-        <ReelableMark className="h-7 w-7" />
-        <div className="flex items-baseline gap-2.5 leading-tight">
-          <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
-          <span className="text-xs text-background/60">
-            {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
-          </span>
+      <div className="pointer-events-auto flex flex-col items-center gap-1.5">
+        <img src={symbolLogo} alt="Symbol" className="h-4 w-auto opacity-80" />
+        <div className="flex items-center gap-3.5 rounded-full bg-foreground px-6 py-2.5 shadow-elegant">
+          <ReelableMark className="h-7 w-7" />
+          <div className="flex items-baseline gap-2.5 leading-tight">
+            <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
+            <span className="text-xs text-background/60">
+              {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
+            </span>
+          </div>
         </div>
       </div>
       <button
