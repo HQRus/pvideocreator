@@ -1,7 +1,7 @@
 import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function ReelableMark({ className }: { className?: string }) {
+export function BrandMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
