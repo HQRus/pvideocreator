@@ -145,29 +145,35 @@ function FloatingGallery() {
   const [open, setOpen] = useState(false);
   return (
     <aside
-      className={`pointer-events-auto absolute left-4 top-4 bottom-4 z-30 flex flex-col rounded-3xl border border-border/60 bg-card/80 shadow-elegant backdrop-blur-xl transition-all duration-300 ${
-        open ? "w-72" : "w-16"
+      onClick={() => {
+        if (!open) setOpen(true);
+      }}
+      className={`pointer-events-auto absolute left-4 top-4 z-30 flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-card shadow-elegant backdrop-blur-xl transition-all duration-300 ${
+        open ? "w-72 cursor-default" : "w-16 cursor-pointer hover:shadow-glow"
       }`}
     >
-      <div className="flex h-14 items-center justify-between px-3">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label={open ? "Collapse gallery" : "Expand gallery"}
-        >
-          {open ? <ChevronLeft className="h-4 w-4" /> : <FolderOpen className="h-4 w-4" />}
-        </button>
+      <div className="flex h-14 shrink-0 items-center justify-between px-3">
+        <div className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground">
+          <FolderOpen className="h-4 w-4" />
+        </div>
         {open && (
           <span className="font-display text-base tracking-tight">Gallery</span>
         )}
         {open && (
-          <button className="grid h-9 w-9 place-items-center rounded-full bg-brand-gradient text-primary-foreground shadow-glow hover:opacity-95">
-            <Plus className="h-4 w-4" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+            }}
+            className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Collapse gallery"
+          >
+            <ChevronLeft className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         {open ? (
           <div className="flex flex-col gap-2">
             {GALLERY_PROJECTS.map((p) => (
@@ -190,11 +196,17 @@ function FloatingGallery() {
                 </div>
               </button>
             ))}
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="mt-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-3 text-sm font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            >
+              <Plus className="h-4 w-4" /> New project
+            </button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
             {GALLERY_PROJECTS.map((p) => (
-              <button
+              <div
                 key={p.id}
                 title={p.title}
                 className={`h-12 w-12 overflow-hidden rounded-xl border transition ${
@@ -204,24 +216,14 @@ function FloatingGallery() {
                 }`}
               >
                 <img src={p.thumb} alt={p.title} className="h-full w-full object-cover" />
-              </button>
+              </div>
             ))}
-            <button className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground">
+            <div className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground">
               <Plus className="h-4 w-4" />
-            </button>
+            </div>
           </div>
         )}
       </div>
-
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="absolute -right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant hover:text-foreground"
-          aria-label="Expand gallery"
-        >
-          <ChevronRight className="h-3 w-3" />
-        </button>
-      )}
     </aside>
   );
 }
