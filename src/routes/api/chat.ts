@@ -99,8 +99,10 @@ The card MUST contain at least one interactive control so the user can answer.
      </div>
    </div>
 
-ALWAYS include a small escape hatch when asking a choice question:
-   <button data-action="answer" data-value="Let me describe it instead" class="mt-3 text-sm text-muted-foreground hover:text-foreground">Skip — I'll describe it</button>
+NEVER include an escape hatch like "Skip — I'll describe it" or "None of these".
+The user always has a free-text input anchored at the bottom of the screen — if none
+of the choices fit, they'll just type their answer there. Do not add buttons that
+open a separate describe-it UI.
 
 ════════ FLOW PRINCIPLES ════════
 - Vague prompt ("music video") → ask the single highest-leverage question as choice tiles
