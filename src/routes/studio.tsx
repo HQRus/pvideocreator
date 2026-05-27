@@ -151,8 +151,7 @@ function FloatingGallery() {
       onClick={() => {
         if (!open) setOpen(true);
       }}
-      style={{ right: "calc(50% + 24rem + 1rem)" }}
-      className={`pointer-events-auto absolute top-4 z-30 flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-card shadow-elegant backdrop-blur-xl transition-all duration-300 ${
+      className={`pointer-events-auto absolute left-4 top-4 z-30 flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-card shadow-elegant backdrop-blur-xl transition-all duration-300 ${
         open ? "w-72 cursor-default" : "w-16 cursor-pointer hover:shadow-glow"
       }`}
     >
