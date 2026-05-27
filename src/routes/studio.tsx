@@ -409,7 +409,7 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
       </Conversation>
 
       {/* Anchored composer: active card stacks directly above the input */}
-      <div className="border-t border-border/60 bg-background/80 backdrop-blur">
+      <div className="bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-3xl px-8 pb-8 pt-6">
           {!busy && activeCard && (
             <div className="mb-4">
