@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -56,11 +56,6 @@ import {
   type ProjectState,
   type Scene,
 } from "@/lib/project-state";
-import sample1 from "@/assets/sample-1.jpg";
-import sample2 from "@/assets/sample-2.jpg";
-import sample3 from "@/assets/sample-3.jpg";
-import sample4 from "@/assets/sample-4.jpg";
-
 export const Route = createFileRoute("/studio")({
   component: Studio,
 });
@@ -68,6 +63,26 @@ export const Route = createFileRoute("/studio")({
 // ---------- page ----------
 
 function Studio() {
+  const navigate = useNavigate();
+  const [gate, setGate] = useState<"checking" | "ready">("checking");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/pika/status");
+        const j = (await r.json()) as { state?: string };
+        if (cancelled) return;
+        if (j.state === "ready") setGate("ready");
+        else void navigate({ to: "/" });
+      } catch {
+        if (!cancelled) void navigate({ to: "/" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
   const [project, setProject] = useState<ProjectState>(INITIAL_PROJECT);
   const [activeSceneId, setActiveSceneId] = useState<string>(
     INITIAL_PROJECT.scenes[0]?.id ?? "",
@@ -82,6 +97,14 @@ function Studio() {
 
   const setScenes = (next: Scene[]) =>
     setProject((prev) => ({ ...prev, scenes: next }));
+
+  if (gate !== "ready") {
+    return (
+      <div className="grid h-screen w-full place-items-center bg-background text-sm text-muted-foreground">
+        Checking Pika connection…
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-background p-10 text-foreground">
@@ -99,7 +122,7 @@ function Studio() {
         </div>
       </div>
 
-      <FloatingGallery />
+      <FloatingGallery projectTitle={meta.title} />
 
       <aside
         className={`pointer-events-auto absolute right-4 top-4 bottom-4 z-30 overflow-hidden rounded-3xl bg-card shadow-elegant transition-[width,opacity] duration-300 ease-out ${
@@ -136,15 +159,7 @@ function Studio() {
 
 // ---------- gallery rail (left, projects) ----------
 
-const GALLERY_PROJECTS = [
-  { id: "p1", title: "Neon Drift", meta: "Music video · 9:16", thumb: sample1, active: true },
-  { id: "p2", title: "Coastline", meta: "Short film · 16:9", thumb: sample2 },
-  { id: "p3", title: "Powder Run", meta: "Sports edit · 9:16", thumb: sample3 },
-  { id: "p4", title: "Atelier", meta: "Brand spot · 1:1", thumb: sample4 },
-  { id: "p5", title: "Late Bloom", meta: "Music video · 9:16", thumb: sample2 },
-];
-
-function FloatingGallery() {
+function FloatingGallery({ projectTitle }: { projectTitle: string }) {
   const [open, setOpen] = useState(false);
   return (
     <aside
@@ -179,26 +194,17 @@ function FloatingGallery() {
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         {open ? (
           <div className="flex flex-col gap-2">
-            {GALLERY_PROJECTS.map((p) => (
-              <button
-                key={p.id}
-                className={`flex items-center gap-3 rounded-2xl p-2 text-left transition ${
-                  p.active
-                    ? "bg-muted/70"
-                    : "hover:bg-muted/40"
-                }`}
-              >
-                <img
-                  src={p.thumb}
-                  alt=""
-                  className="h-14 w-14 shrink-0 rounded-xl object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold">{p.title}</div>
-                  <div className="truncate text-xs text-muted-foreground">{p.meta}</div>
-                </div>
-              </button>
-            ))}
+            <button
+              className="flex items-center gap-3 rounded-2xl bg-muted/70 p-2 text-left"
+            >
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-brand-gradient text-primary-foreground">
+                <Film className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">{projectTitle}</div>
+                <div className="truncate text-xs text-muted-foreground">Current project</div>
+              </div>
+            </button>
             <button
               onClick={(e) => e.stopPropagation()}
               className="mt-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-3 text-sm font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
@@ -208,17 +214,12 @@ function FloatingGallery() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            {GALLERY_PROJECTS.map((p) => (
-              <div
-                key={p.id}
-                title={p.title}
-                className={`h-12 w-12 overflow-hidden rounded-xl transition ${
-                  p.active ? "opacity-100" : "opacity-70 hover:opacity-100"
-                }`}
-              >
-                <img src={p.thumb} alt={p.title} className="h-full w-full object-cover" />
-              </div>
-            ))}
+            <div
+              title={projectTitle}
+              className="grid h-12 w-12 place-items-center rounded-xl bg-brand-gradient text-primary-foreground"
+            >
+              <Film className="h-4 w-4" />
+            </div>
             <div className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground">
               <Plus className="h-4 w-4" />
             </div>
