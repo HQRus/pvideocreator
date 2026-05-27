@@ -415,6 +415,12 @@ export function GenerativeCard({
       const pairs: string[] = [];
       const assets: LiveAsset[] = [];
       const seen = new Map<string, unknown[]>();
+      // First: pick up every file input in the form, named or not, so an
+      // upload always reaches the answer payload.
+      form.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach((c) => {
+        const list = pendingFiles.get(c) || [];
+        if (list.length) assets.push(...list);
+      });
       const controls = form.querySelectorAll<
         HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
       >("input[name], select[name], textarea[name]");
@@ -422,9 +428,9 @@ export function GenerativeCard({
         const name = c.name;
         if (!name) return;
         if (c instanceof HTMLInputElement && c.type === "file") {
+          // already collected above; just surface ids under the named field
           const list = pendingFiles.get(c) || [];
           if (list.length) {
-            assets.push(...list);
             const arr = seen.get(name) || [];
             for (const a of list) arr.push(a.id);
             seen.set(name, arr);
