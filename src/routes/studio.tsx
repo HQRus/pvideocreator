@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -248,13 +248,6 @@ function StudioTopBar({
 }) {
   return (
     <header className="pointer-events-none relative z-20 flex shrink-0 justify-center px-4 py-3">
-      <Link
-        to="/studio"
-        className="pointer-events-auto absolute left-80 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-        aria-label="Back home"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Link>
       <div className="pointer-events-auto flex flex-col items-center gap-6">
         <img src={symbolLogo} alt="Symbol" className="h-[21px] w-auto brightness-0" />
         <div className="flex items-center gap-3.5 rounded-full bg-foreground px-6 py-2.5 shadow-elegant">
