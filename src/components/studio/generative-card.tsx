@@ -39,10 +39,14 @@ const SANITIZE_CONFIG = {
   ADD_TAGS: ["img", "audio", "video", "source"],
   FORBID_TAGS: ["script", "style", "link", "iframe", "object", "embed"],
   FORBID_ATTR: ["style", "onclick", "onsubmit", "onload", "onerror"],
-  // Allow blob:, https:, http:, data:image, plus tel/mailto for completeness.
-  // The default DOMPurify regex rejects blob: which we need for in-browser uploads.
+  // Mirror DOMPurify's default URI allow-list but additionally permit `blob:`
+  // (needed for in-browser uploads). Keeping the same overall shape as the
+  // default is important: a stricter custom regex here ends up rejecting
+  // non-URI attribute values like `type="file"`, `accept="image/*"`, and
+  // `capture="environment"`, which silently breaks photo upload / camera
+  // capture inside generative cards.
   ALLOWED_URI_REGEXP:
-    /^(?:(?:blob|https?|mailto|tel):|data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);|#|\/)/i,
+    /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
 };
 
 export function extractCardTitle(html: string): string {
