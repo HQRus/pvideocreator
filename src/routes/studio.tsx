@@ -270,6 +270,8 @@ const STARTERS = [
 
 function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
   const [input, setInput] = useState("");
+  const [outgoing, setOutgoing] = useState<{ text: string; id: number } | null>(null);
+  const outgoingIdRef = useRef(0);
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
   });
@@ -280,6 +282,9 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput("");
+    const id = ++outgoingIdRef.current;
+    setOutgoing({ text: trimmed, id });
+    setTimeout(() => setOutgoing((o) => (o?.id === id ? null : o)), 650);
     await sendMessage({ text: trimmed });
   };
 
