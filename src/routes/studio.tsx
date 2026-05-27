@@ -44,12 +44,14 @@ import {
   extractCardTitle,
   extractCardProse,
   extractProjectPatch,
+  type CardAnswer,
 } from "@/components/studio/generative-card";
 import {
   INITIAL_PROJECT,
   applyPatch,
   type Character,
   type Music,
+  type ProjectAsset,
   type ProjectPatch,
   type ProjectState,
   type Scene,
@@ -71,7 +73,7 @@ function Studio() {
     INITIAL_PROJECT.scenes[0]?.id ?? "",
   );
   const [panelOpen, setPanelOpen] = useState(true);
-  const { scenes, cast, music, meta } = project;
+  const { scenes, cast, music, meta, assets } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
   const handlePatch = (patch: ProjectPatch) => {
@@ -93,7 +95,7 @@ function Studio() {
           onTogglePanel={() => setPanelOpen((o) => !o)}
         />
         <div className="min-h-0 flex-1">
-          <ChatPanel onPatch={handlePatch} />
+          <ChatPanel onPatch={handlePatch} assets={assets} />
         </div>
       </div>
 
@@ -111,6 +113,7 @@ function Studio() {
             setScenes={setScenes}
             cast={cast}
             music={music}
+            assets={assets}
             activeSceneId={activeSceneId}
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
@@ -287,7 +290,13 @@ const STARTERS = [
   "TikTok hook — fashion",
 ];
 
-function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
+function ChatPanel({
+  onPatch,
+  assets,
+}: {
+  onPatch: (patch: ProjectPatch) => void;
+  assets: ProjectAsset[];
+}) {
   const [input, setInput] = useState("");
   const [outgoing, setOutgoing] = useState<{ text: string; id: number } | null>(null);
   const outgoingIdRef = useRef(0);
@@ -305,6 +314,16 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
     setOutgoing({ text: trimmed, id });
     setTimeout(() => setOutgoing((o) => (o?.id === id ? null : o)), 650);
     await sendMessage({ text: trimmed });
+  };
+
+  // Card answers can also carry uploaded assets. Patch them into project
+  // state immediately so the panel reflects the upload, then send a
+  // human-readable summary to the model (with asset ids it can reference).
+  const handleCardAnswer = async (answer: CardAnswer) => {
+    if (answer.assets.length) {
+      onPatch({ assetsAppend: answer.assets });
+    }
+    await handleSend(answer.summary);
   };
 
   const textOf = (m: UIMessage) =>
@@ -416,7 +435,8 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
               <GenerativeCard
                 key={activeCard.key}
                 html={activeCard.html}
-                onAnswer={handleSend}
+                onAnswer={handleCardAnswer}
+                assets={assets}
               />
             </div>
           )}
@@ -652,6 +672,7 @@ function StructurePanel({
   setScenes,
   cast,
   music,
+  assets,
   activeSceneId,
   onSelect,
   totalDuration,
@@ -669,6 +690,7 @@ function StructurePanel({
   setScenes: (s: Scene[]) => void;
   cast: Character[];
   music: Music;
+  assets: ProjectAsset[];
   activeSceneId: string;
   onSelect: (id: string) => void;
   totalDuration: number;
@@ -689,6 +711,7 @@ function StructurePanel({
               "Your video's overview will appear here and evolve as you make decisions in the chat."}
           </p>
           <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
+          {assets.length > 0 && <AssetsStrip assets={assets} />}
         </div>
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
@@ -863,6 +886,36 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
         {icon}
       </div>
       <div className="max-w-[260px] text-base font-medium leading-relaxed text-muted-foreground">{text}</div>
+    </div>
+  );
+}
+
+function AssetsStrip({ assets }: { assets: ProjectAsset[] }) {
+  return (
+    <div className="mt-5">
+      <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+        References
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {assets.map((a) => (
+          <div
+            key={a.id}
+            className="group relative overflow-hidden rounded-xl border border-border/60 bg-muted/40"
+            title={`${a.kind} · ${a.name}`}
+          >
+            {a.mime.startsWith("image/") ? (
+              <img src={a.url} alt={a.name} className="h-16 w-16 object-cover" />
+            ) : (
+              <div className="grid h-16 w-16 place-items-center text-lg text-muted-foreground">
+                {a.mime.startsWith("audio/") ? "♪" : a.mime.startsWith("video/") ? "▶" : "•"}
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent px-1.5 pb-1 pt-3 text-[9px] font-semibold capitalize text-foreground">
+              {a.kind}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

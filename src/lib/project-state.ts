@@ -25,6 +25,31 @@ export type Music = {
   duration: number;
 } | null;
 
+// User-provided or AI-generated reference assets attached to the project.
+// `kind` tells the panel where to surface it (likeness → Cast tab,
+// audio refs → Audio tab, anything else → Overview).
+export type AssetKind =
+  | "likeness"
+  | "logo"
+  | "reference"
+  | "voice"
+  | "audio"
+  | "video"
+  | "other";
+
+export type ProjectAsset = {
+  id: string;
+  kind: AssetKind;
+  mime: string;
+  name: string;
+  url: string; // blob: URL today, https: when we move to Cloud storage
+  label?: string;
+  attachedTo?: string; // e.g. character id, scene id
+  width?: number;
+  height?: number;
+  duration?: number;
+};
+
 export type ProjectMeta = {
   title: string;
   format: string; // "Music video", "Short film", ...
@@ -40,6 +65,7 @@ export type ProjectState = {
   scenes: Scene[];
   cast: Character[];
   music: Music;
+  assets: ProjectAsset[];
 };
 
 // Patches the model can emit. Each field, if present, replaces (or in the
@@ -52,6 +78,8 @@ export type ProjectPatch = Partial<{
   cast: Partial<Character>[];
   castAppend: Partial<Character>[];
   music: Partial<NonNullable<Music>>;
+  assets: Partial<ProjectAsset>[];
+  assetsAppend: Partial<ProjectAsset>[];
 }>;
 
 export const INITIAL_PROJECT: ProjectState = {
@@ -67,6 +95,7 @@ export const INITIAL_PROJECT: ProjectState = {
   scenes: [],
   cast: [],
   music: null,
+  assets: [],
 };
 
 let idCounter = 1000;
@@ -91,6 +120,21 @@ function normalizeCharacter(c: Partial<Character>, idx: number): Character {
     role: c.role ?? "Character",
     ref: c.ref ?? "",
     notes: c.notes ?? "",
+  };
+}
+
+function normalizeAsset(a: Partial<ProjectAsset>): ProjectAsset {
+  return {
+    id: a.id ?? newId("ast"),
+    kind: a.kind ?? "reference",
+    mime: a.mime ?? "application/octet-stream",
+    name: a.name ?? "asset",
+    url: a.url ?? "",
+    label: a.label,
+    attachedTo: a.attachedTo,
+    width: a.width,
+    height: a.height,
+    duration: a.duration,
   };
 }
 
@@ -147,6 +191,15 @@ export function applyPatch(
       duration: 0,
     };
     next = { ...next, music: { ...base, ...patch.music } };
+  }
+
+  if (Array.isArray(patch.assets)) {
+    next = { ...next, assets: patch.assets.map(normalizeAsset) };
+  } else if (Array.isArray(patch.assetsAppend)) {
+    next = {
+      ...next,
+      assets: [...next.assets, ...patch.assetsAppend.map(normalizeAsset)],
+    };
   }
 
   return next;
