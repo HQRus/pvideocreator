@@ -95,7 +95,7 @@ function Studio() {
           onTogglePanel={() => setPanelOpen((o) => !o)}
         />
         <div className="min-h-0 flex-1">
-          <ChatPanel onPatch={handlePatch} />
+          <ChatPanel onPatch={handlePatch} assets={assets} />
         </div>
       </div>
 
