@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Play,
   Pause,
@@ -468,6 +468,15 @@ function PreviewPanel({
 
       <div className="flex-1 overflow-auto p-6">
         <div className="mx-auto max-w-4xl">
+          {scenes.length === 0 ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/20 p-10 text-center">
+              <LayoutGrid className="h-6 w-6 text-muted-foreground" />
+              <div className="text-sm font-medium">No scenes yet</div>
+              <div className="max-w-xs text-xs text-muted-foreground">
+                As you chat with the director on the left, scenes will appear here.
+              </div>
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {scenes.map((s) => (
               <SceneTile
@@ -484,6 +493,7 @@ function PreviewPanel({
               </div>
             </button>
           </div>
+          )}
         </div>
       </div>
 
@@ -495,6 +505,11 @@ function PreviewPanel({
           <span>{formatDuration(totalDuration)}</span>
         </div>
         <div className="flex gap-1 overflow-x-auto">
+          {scenes.length === 0 && (
+            <div className="flex-1 rounded-md border border-dashed border-border/60 px-2 py-2 text-center text-[10px] text-muted-foreground/70">
+              Timeline empty
+            </div>
+          )}
           {scenes.map((s) => (
             <button
               key={s.id}
@@ -506,11 +521,13 @@ function PreviewPanel({
                   : "border-border hover:border-primary/40"
               }`}
             >
-              <img
-                src={s.thumb}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover opacity-50 group-hover:opacity-70"
-              />
+              {s.thumb && (
+                <img
+                  src={s.thumb}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover opacity-50 group-hover:opacity-70"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
               <div className="absolute bottom-0.5 left-1 text-[10px] font-medium">
                 #{s.n}
@@ -544,12 +561,18 @@ function SceneTile({
           : "border-border hover:border-primary/40"
       }`}
     >
-      <div className="aspect-[9/16] overflow-hidden">
-        <img
-          src={scene.thumb}
-          alt={scene.title}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
+      <div className="aspect-[9/16] overflow-hidden bg-muted">
+        {scene.thumb ? (
+          <img
+            src={scene.thumb}
+            alt={scene.title}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center text-muted-foreground/50">
+            <Film className="h-6 w-6" />
+          </div>
+        )}
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent" />
       <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-[10px] backdrop-blur">
@@ -641,6 +664,9 @@ function StructurePanel({
 
         <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto p-3">
           <div className="space-y-2">
+            {scenes.length === 0 && (
+              <EmptyHint icon={<Film className="h-4 w-4" />} text="Scenes will appear as you build out the storyboard." />
+            )}
             {scenes.map((s) => (
               <SceneRow
                 key={s.id}
@@ -660,16 +686,25 @@ function StructurePanel({
 
         <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto p-3">
           <div className="space-y-2">
+            {cast.length === 0 && (
+              <EmptyHint icon={<Users className="h-4 w-4" />} text="No cast yet — ask the director to suggest characters." />
+            )}
             {cast.map((c) => (
               <div
                 key={c.id}
                 className="flex gap-3 rounded-lg border border-border bg-card/40 p-2.5"
               >
-                <img
-                  src={c.ref}
-                  alt={c.name}
-                  className="h-16 w-16 shrink-0 rounded-md object-cover"
-                />
+                {c.ref ? (
+                  <img
+                    src={c.ref}
+                    alt={c.name}
+                    className="h-16 w-16 shrink-0 rounded-md object-cover"
+                  />
+                ) : (
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground/60">
+                    <Users className="h-5 w-5" />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium">{c.name}</div>
@@ -690,15 +725,18 @@ function StructurePanel({
         </TabsContent>
 
         <TabsContent value="music" className="m-0 flex-1 overflow-y-auto p-3">
+          {!music ? (
+            <EmptyHint icon={<Music2 className="h-4 w-4" />} text="No music brief yet — describe the vibe or tempo you want." />
+          ) : (
           <div className="rounded-xl border border-border bg-card/40 p-3">
             <div className="flex items-center gap-3">
               <div className="grid h-12 w-12 place-items-center rounded-lg bg-brand-gradient shadow-glow">
                 <Music2 className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{music.title}</div>
+                <div className="text-sm font-medium">{music.title || "Untitled track"}</div>
                 <div className="truncate text-[11px] text-muted-foreground">
-                  {music.artist}
+                  {music.artist || "—"}
                 </div>
               </div>
               <Button variant="ghost" size="icon-sm">
@@ -707,15 +745,15 @@ function StructurePanel({
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{music.bpm}</div>
+                <div className="text-foreground">{music.bpm || "—"}</div>
                 <div className="text-muted-foreground">BPM</div>
               </div>
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{music.key}</div>
+                <div className="text-foreground">{music.key || "—"}</div>
                 <div className="text-muted-foreground">Key</div>
               </div>
               <div className="rounded-md bg-muted/60 py-1.5">
-                <div className="text-foreground">{formatDuration(music.duration)}</div>
+                <div className="text-foreground">{music.duration ? formatDuration(music.duration) : "—"}</div>
                 <div className="text-muted-foreground">Length</div>
               </div>
             </div>
@@ -740,13 +778,18 @@ function StructurePanel({
               </div>
             </div>
           </div>
-
-          <div className="mt-3 rounded-xl border border-border bg-card/40 p-3 text-xs text-muted-foreground">
-            <div className="mb-1 font-medium text-foreground">Sound design</div>
-            Synthwave pad, sub bass drop on scene 3 drift, neon hum bed throughout.
-          </div>
+          )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/20 px-4 py-10 text-center text-xs text-muted-foreground">
+      <div className="text-muted-foreground/70">{icon}</div>
+      <div className="max-w-[220px] leading-relaxed">{text}</div>
     </div>
   );
 }
@@ -772,11 +815,17 @@ function SceneRow({
     >
       <div className="flex gap-2.5">
         <GripVertical className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-        <img
-          src={scene.thumb}
-          alt=""
-          className="h-14 w-10 shrink-0 rounded object-cover"
-        />
+        {scene.thumb ? (
+          <img
+            src={scene.thumb}
+            alt=""
+            className="h-14 w-10 shrink-0 rounded object-cover"
+          />
+        ) : (
+          <div className="grid h-14 w-10 shrink-0 place-items-center rounded bg-muted text-muted-foreground/50">
+            <Film className="h-4 w-4" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
