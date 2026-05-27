@@ -364,6 +364,7 @@ function ChatPanel() {
               {error.message ?? "Something went wrong with the AI gateway."}
             </div>
           )}
+          <div ref={bottomRef} className="h-4" />
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
