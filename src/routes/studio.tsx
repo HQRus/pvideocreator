@@ -262,6 +262,9 @@ function StudioTopBar({
           </span>
         </div>
       </div>
+      <div className="pointer-events-auto absolute right-20 top-1/2 -translate-y-1/2">
+        <PikaConnectPill />
+      </div>
       <button
         onClick={onTogglePanel}
         className="pointer-events-auto absolute right-6 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -273,10 +276,120 @@ function StudioTopBar({
   );
 }
 
+function PikaConnectPill() {
+  const [state, setState] = useState<"loading" | "disconnected" | "connecting" | "ready" | "error">("loading");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const refresh = async () => {
+    try {
+      const r = await fetch("/api/pika/status");
+      const j = (await r.json()) as { state?: string };
+      setState(j.state === "ready" ? "ready" : "disconnected");
+    } catch {
+      setState("error");
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const onConnect = async () => {
+    setState("connecting");
+    try {
+      const r = await fetch("/api/pika/connect", { method: "POST" });
+      const j = (await r.json()) as { state?: string; authUrl?: string };
+      if (j.state === "ready") { setState("ready"); return; }
+      if (j.authUrl) {
+        window.open(j.authUrl, "_blank", "noopener,noreferrer");
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = setInterval(async () => {
+          const s = await fetch("/api/pika/status").then((r) => r.json() as Promise<{ state?: string }>);
+          if (s.state === "ready") {
+            setState("ready");
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          }
+        }, 2000);
+      } else {
+        setState("error");
+      }
+    } catch {
+      setState("error");
+    }
+  };
+
+  const onDisconnect = async () => {
+    await fetch("/api/pika/disconnect", { method: "POST" });
+    setState("disconnected");
+  };
+
+  if (state === "ready") {
+    return (
+      <button
+        onClick={onDisconnect}
+        className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3.5 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/25"
+        title="Pika connected — click to disconnect"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        Pika
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={onConnect}
+      disabled={state === "connecting" || state === "loading"}
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-60"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+      {state === "connecting" ? "Connecting Pika…" : state === "loading" ? "…" : "Connect Pika"}
+    </button>
+  );
+}
+
 function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// Deep-walk a Pika MCP tool result looking for video URLs. MCP responses
+// usually arrive as { content: [{ type: "text", text: "..." }, ...] } and
+// may also include structuredContent. We accept any http(s) URL with a
+// video-ish extension or path hint.
+function extractVideoAssets(out: unknown): ProjectAsset[] {
+  const urls = new Set<string>();
+  const visit = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const re = /https?:\/\/[^\s"'<>)]+/g;
+      const matches = v.match(re);
+      if (matches) {
+        for (const u of matches) {
+          if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u) || /pika|video|cdn/i.test(u)) {
+            if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) urls.add(u);
+          }
+        }
+      }
+      return;
+    }
+    if (Array.isArray(v)) { v.forEach(visit); return; }
+    if (typeof v === "object") {
+      for (const val of Object.values(v as Record<string, unknown>)) visit(val);
+    }
+  };
+  visit(out);
+  let i = 0;
+  return Array.from(urls).map((url) => ({
+    id: `ast_pika_${Date.now().toString(36)}_${i++}`,
+    kind: "video" as const,
+    mime: /\.webm/i.test(url) ? "video/webm" : "video/mp4",
+    name: url.split("/").pop()?.split("?")[0] || "pika-clip.mp4",
+    url,
+    label: "Pika clip",
+  }));
 }
 
 // ---------- chat panel ----------
@@ -382,6 +495,10 @@ function ChatPanel({
           onPatch({ assetsAppend: out.assets });
         } else if (p.type === "tool-commit_project_patch" && out.patch) {
           onPatch(out.patch as ProjectPatch);
+        } else if (p.type.startsWith("tool-pika_")) {
+          // Sweep Pika MCP tool outputs for video URLs and attach them.
+          const videos = extractVideoAssets(out);
+          if (videos.length) onPatch({ assetsAppend: videos });
         }
       }
     }
