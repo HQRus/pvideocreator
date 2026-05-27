@@ -526,10 +526,66 @@ export function DecisionPill({
   );
 }
 
-export function UserBubble({ text }: { text: string }) {
+export function UserBubble({
+  text,
+  assets,
+}: {
+  text: string;
+  assets?: ProjectAsset[];
+}) {
+  // Pull asset ids out of the summary so we can render attachments inline.
+  const ids = Array.from(text.matchAll(/\[(ast_[a-z0-9]+)\]/gi)).map((m) => m[1]);
+  const byId = new Map((assets ?? []).map((a) => [a.id, a]));
+  const refs = ids.map((id) => byId.get(id)).filter(Boolean) as ProjectAsset[];
+
+  // Strip "<kind>: name WxH [ast_xxx]" descriptors (and bare [ast_xxx])
+  // so the bubble shows clean prose instead of the raw asset summary.
+  let cleaned = text
+    .replace(
+      /(?:^|\s|·|;)\s*(?:[a-z /]+):\s*[^;·\n]*?\[ast_[a-z0-9]+\]/gi,
+      "",
+    )
+    .replace(/\[ast_[a-z0-9]+\]/gi, "")
+    .replace(/^\s*attached\s*[—-]\s*/i, "")
+    .replace(/\s*·\s*·\s*/g, " · ")
+    .replace(/^[\s·;,-]+|[\s·;,-]+$/g, "")
+    .trim();
+
+  const images = refs.filter((a) => a.mime.startsWith("image/"));
+  const others = refs.filter((a) => !a.mime.startsWith("image/"));
+
   return (
-    <div className="ml-auto max-w-[80%] animate-pill-land rounded-3xl bg-secondary px-5 py-3.5 text-base leading-snug text-foreground shadow-elegant">
-      {text}
+    <div className="ml-auto flex max-w-[80%] animate-pill-land flex-col gap-2 self-end">
+      {images.length > 0 && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {images.map((a) => (
+            <img
+              key={a.id}
+              src={a.url}
+              alt={a.name}
+              className="max-h-64 max-w-full rounded-3xl object-cover shadow-elegant"
+            />
+          ))}
+        </div>
+      )}
+      {others.length > 0 && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {others.map((a) => (
+            <div
+              key={a.id}
+              className="rounded-2xl bg-muted px-3 py-2 text-xs text-muted-foreground"
+            >
+              {a.mime.startsWith("audio/") ? "♪ " : a.mime.startsWith("video/") ? "▶ " : "• "}
+              {a.name}
+            </div>
+          ))}
+        </div>
+      )}
+      {cleaned && (
+        <div className="rounded-3xl bg-secondary px-5 py-3.5 text-base leading-snug text-foreground shadow-elegant">
+          {cleaned}
+        </div>
+      )}
     </div>
   );
 }
