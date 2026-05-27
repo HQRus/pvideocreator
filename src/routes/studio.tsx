@@ -157,7 +157,7 @@ function FloatingGallery() {
           <FolderOpen className="h-4 w-4" />
         </div>
         {open && (
-          <span className="font-display text-base tracking-tight">Gallery</span>
+          <span className="font-display text-base tracking-tight">Projects</span>
         )}
         {open && (
           <button
@@ -166,7 +166,7 @@ function FloatingGallery() {
               setOpen(false);
             }}
             className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Collapse gallery"
+            aria-label="Collapse projects"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
