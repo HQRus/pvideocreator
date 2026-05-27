@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
+import symbolLogo from "@/assets/symbol.svg";
 
 export const Route = createFileRoute("/")({
   component: ConnectGate,
@@ -114,6 +115,11 @@ function ConnectGate() {
       <header className="flex h-20 items-center px-8" />
 
       <section className="mx-auto flex max-w-3xl flex-col items-center px-6 pt-24 text-center sm:pt-32">
+        <img
+          src={symbolLogo}
+          alt="Reelable symbol"
+          className="mb-6 h-5 w-auto"
+        />
         <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
           AI Video Director Prototype
         </h1>
