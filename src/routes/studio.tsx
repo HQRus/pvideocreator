@@ -515,7 +515,6 @@ function ChatPanel({
             onSubmit={async (msg) => {
               await handleSend(msg.text ?? input);
             }}
-            className="[&_[role=group]]:border-transparent [&_[role=group]]:shadow-none [&_[role=group]]:has-[[data-slot=input-group-control]:focus-visible]:ring-0 [&_[role=group]]:has-[[data-slot=input-group-control]:focus-visible]:border-foreground/15"
           >
             <PromptInputTextarea
               autoFocus
