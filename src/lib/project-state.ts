@@ -1,8 +1,3 @@
-import sample1 from "@/assets/sample-1.jpg";
-import sample2 from "@/assets/sample-2.jpg";
-import sample3 from "@/assets/sample-3.jpg";
-import sample4 from "@/assets/sample-4.jpg";
-
 export type Scene = {
   id: string;
   n: number;
@@ -28,7 +23,7 @@ export type Music = {
   key: string;
   beats: number[];
   duration: number;
-};
+} | null;
 
 export type ProjectMeta = {
   title: string;
@@ -52,36 +47,18 @@ export type ProjectPatch = Partial<{
   scenesAppend: Partial<Scene>[];
   cast: Partial<Character>[];
   castAppend: Partial<Character>[];
-  music: Partial<Music>;
+  music: Partial<NonNullable<Music>>;
 }>;
-
-const SAMPLE_THUMBS = [sample1, sample2, sample3, sample4];
 
 export const INITIAL_PROJECT: ProjectState = {
   meta: {
-    title: "Neon Drift",
-    format: "Music video",
-    aspectRatio: "9:16",
+    title: "Untitled project",
+    format: "—",
+    aspectRatio: "—",
   },
-  scenes: [
-    { id: "s1", n: 1, title: "Cold open — neon street", prompt: "Wide shot, rain-soaked Tokyo alley at midnight. Neon signs flicker. A lone figure walks toward camera, silhouette only.", duration: 6, thumb: sample1, status: "ready" },
-    { id: "s2", n: 2, title: "Close-up — the helmet", prompt: "Extreme close-up on a chrome motorcycle helmet, reflections of neon glide across the visor.", duration: 4, thumb: sample3, status: "ready" },
-    { id: "s3", n: 3, title: "Drift sequence", prompt: "Tracking shot, bike drifting around a wet corner, sparks. Slow motion, 60fps.", duration: 8, thumb: sample2, status: "rendering" },
-    { id: "s4", n: 4, title: "Skyline reveal", prompt: "Drone pull-back revealing the futuristic skyline. Camera rises through clouds.", duration: 6, thumb: sample4, status: "drafting" },
-    { id: "s5", n: 5, title: "Logo card", prompt: "Brand logo materializes from particles on black background. Subtle hum.", duration: 3, thumb: sample1, status: "drafting" },
-  ],
-  cast: [
-    { id: "c1", name: "The Rider", role: "Protagonist", ref: sample3, notes: "Mid-20s, androgynous, chrome helmet, charcoal racing suit." },
-    { id: "c2", name: "The Voice", role: "Narrator (VO)", ref: sample2, notes: "Low warm female voice, intimate, slight reverb." },
-  ],
-  music: {
-    title: "Midnight Drift",
-    artist: "Generated · synthwave",
-    bpm: 96,
-    key: "F# minor",
-    beats: [0.0, 2.5, 5.0, 7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0],
-    duration: 27,
-  },
+  scenes: [],
+  cast: [],
+  music: null,
 };
 
 let idCounter = 1000;
@@ -94,7 +71,7 @@ function normalizeScene(s: Partial<Scene>, fallbackN: number): Scene {
     title: s.title ?? "Untitled scene",
     prompt: s.prompt ?? "",
     duration: typeof s.duration === "number" ? s.duration : 5,
-    thumb: s.thumb ?? SAMPLE_THUMBS[(fallbackN - 1) % SAMPLE_THUMBS.length],
+    thumb: s.thumb ?? "",
     status: s.status ?? "drafting",
   };
 }
@@ -104,7 +81,7 @@ function normalizeCharacter(c: Partial<Character>, idx: number): Character {
     id: c.id ?? newId("c"),
     name: c.name ?? "Unnamed",
     role: c.role ?? "Character",
-    ref: c.ref ?? SAMPLE_THUMBS[idx % SAMPLE_THUMBS.length],
+    ref: c.ref ?? "",
     notes: c.notes ?? "",
   };
 }
@@ -153,7 +130,15 @@ export function applyPatch(
   }
 
   if (patch.music) {
-    next = { ...next, music: { ...next.music, ...patch.music } };
+    const base = next.music ?? {
+      title: "",
+      artist: "",
+      bpm: 0,
+      key: "",
+      beats: [],
+      duration: 0,
+    };
+    next = { ...next, music: { ...base, ...patch.music } };
   }
 
   return next;
