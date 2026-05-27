@@ -82,9 +82,9 @@ function Studio() {
     setProject((prev) => ({ ...prev, scenes: next }));
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-background text-foreground">
-      <FloatingGallery />
-      <div className="flex min-w-0 flex-1 flex-col">
+    <div className="relative h-screen w-full overflow-hidden bg-background text-foreground">
+      {/* Centered chat fills the screen; gallery & project panel float over it */}
+      <div className="absolute inset-0 flex flex-col">
         <StudioTopBar
           meta={meta}
           duration={totalDuration}
@@ -92,35 +92,36 @@ function Studio() {
           panelOpen={panelOpen}
           onTogglePanel={() => setPanelOpen((o) => !o)}
         />
-        <div className="flex min-h-0 flex-1 border-t border-border/60">
-          <div className="min-w-0 flex-1 bg-sidebar/30">
-            <ChatPanel onPatch={handlePatch} />
-          </div>
-          <aside
-            className={`shrink-0 overflow-hidden border-l border-border/60 bg-background transition-[width] duration-300 ease-out ${
-              panelOpen ? "w-[440px]" : "w-0"
-            }`}
-          >
-            <div className="h-full w-[440px]">
-              <StructurePanel
-                meta={meta}
-                scenes={scenes}
-                setScenes={setScenes}
-                cast={cast}
-                music={music}
-                activeSceneId={activeSceneId}
-                onSelect={setActiveSceneId}
-                totalDuration={totalDuration}
-              />
-            </div>
-          </aside>
+        <div className="min-h-0 flex-1">
+          <ChatPanel onPatch={handlePatch} />
         </div>
       </div>
+
+      <FloatingGallery />
+
+      <aside
+        className={`pointer-events-auto absolute right-4 top-4 bottom-4 z-30 overflow-hidden rounded-3xl bg-card shadow-elegant transition-[width,opacity] duration-300 ease-out ${
+          panelOpen ? "w-[440px] opacity-100" : "w-0 opacity-0"
+        }`}
+      >
+        <div className="h-full w-[440px]">
+          <StructurePanel
+            meta={meta}
+            scenes={scenes}
+            setScenes={setScenes}
+            cast={cast}
+            music={music}
+            activeSceneId={activeSceneId}
+            onSelect={setActiveSceneId}
+            totalDuration={totalDuration}
+          />
+        </div>
+      </aside>
 
       {!panelOpen && (
         <button
           onClick={() => setPanelOpen(true)}
-          className="absolute right-4 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant transition hover:text-foreground"
+          className="absolute right-4 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-card text-muted-foreground shadow-elegant transition hover:text-foreground"
           aria-label="Open project panel"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -144,29 +145,35 @@ function FloatingGallery() {
   const [open, setOpen] = useState(false);
   return (
     <aside
-      className={`pointer-events-auto absolute left-4 top-4 bottom-4 z-30 flex flex-col rounded-3xl border border-border/60 bg-card/80 shadow-elegant backdrop-blur-xl transition-all duration-300 ${
-        open ? "w-72" : "w-16"
+      onClick={() => {
+        if (!open) setOpen(true);
+      }}
+      className={`pointer-events-auto absolute left-4 top-4 z-30 flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-card shadow-elegant backdrop-blur-xl transition-all duration-300 ${
+        open ? "w-72 cursor-default" : "w-16 cursor-pointer hover:shadow-glow"
       }`}
     >
-      <div className="flex h-14 items-center justify-between px-3">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label={open ? "Collapse gallery" : "Expand gallery"}
-        >
-          {open ? <ChevronLeft className="h-4 w-4" /> : <FolderOpen className="h-4 w-4" />}
-        </button>
+      <div className="flex h-14 shrink-0 items-center justify-between px-3">
+        <div className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground">
+          <FolderOpen className="h-4 w-4" />
+        </div>
         {open && (
           <span className="font-display text-base tracking-tight">Gallery</span>
         )}
         {open && (
-          <button className="grid h-9 w-9 place-items-center rounded-full bg-brand-gradient text-primary-foreground shadow-glow hover:opacity-95">
-            <Plus className="h-4 w-4" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+            }}
+            className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Collapse gallery"
+          >
+            <ChevronLeft className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         {open ? (
           <div className="flex flex-col gap-2">
             {GALLERY_PROJECTS.map((p) => (
@@ -189,11 +196,17 @@ function FloatingGallery() {
                 </div>
               </button>
             ))}
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="mt-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-3 text-sm font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            >
+              <Plus className="h-4 w-4" /> New project
+            </button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
             {GALLERY_PROJECTS.map((p) => (
-              <button
+              <div
                 key={p.id}
                 title={p.title}
                 className={`h-12 w-12 overflow-hidden rounded-xl border transition ${
@@ -203,24 +216,14 @@ function FloatingGallery() {
                 }`}
               >
                 <img src={p.thumb} alt={p.title} className="h-full w-full object-cover" />
-              </button>
+              </div>
             ))}
-            <button className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground">
+            <div className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground">
               <Plus className="h-4 w-4" />
-            </button>
+            </div>
           </div>
         )}
       </div>
-
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="absolute -right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant hover:text-foreground"
-          aria-label="Expand gallery"
-        >
-          <ChevronRight className="h-3 w-3" />
-        </button>
-      )}
     </aside>
   );
 }
@@ -241,14 +244,18 @@ function StudioTopBar({
   onTogglePanel: () => void;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 pl-24 pr-4">
-      <div className="flex items-center gap-3">
-        <Link to="/" className="text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-        <ReelableMark className="h-7 w-7" />
-        <div className="flex flex-col leading-tight">
-          <span className="text-sm font-medium">{meta.title}</span>
+    <header className="pointer-events-none relative z-20 flex h-16 shrink-0 items-center justify-center px-4">
+      <Link
+        to="/"
+        className="pointer-events-auto absolute left-24 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label="Back home"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Link>
+      <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-card px-5 py-2 shadow-elegant">
+        <ReelableMark className="h-6 w-6" />
+        <div className="flex items-baseline gap-2 leading-tight">
+          <span className="text-sm font-semibold tracking-tight">{meta.title}</span>
           <span className="text-[11px] text-muted-foreground">
             {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
           </span>
@@ -256,7 +263,7 @@ function StudioTopBar({
       </div>
       <button
         onClick={onTogglePanel}
-        className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="pointer-events-auto absolute right-6 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
         aria-label={panelOpen ? "Collapse project panel" : "Open project panel"}
       >
         {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -674,8 +681,8 @@ function StructurePanel({
               "Your video's overview will appear here and evolve as you make decisions in the chat."}
           </p>
         </div>
-        <div className="mt-6 border-b-2 border-border/40 px-8 pb-0">
-          <TabsList className="h-auto w-full justify-start gap-8 rounded-none bg-transparent p-0">
+        <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
+          <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
             {[
               { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
               { v: "scenes", icon: Film, label: "Scenes" },
@@ -685,7 +692,7 @@ function StructurePanel({
               <TabsTrigger
                 key={v}
                 value={v}
-                className="-mb-[2px] gap-2 rounded-none border-b-4 border-transparent bg-transparent px-1 pb-4 text-lg font-bold text-muted-foreground/50 shadow-none transition-all data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="-mb-[2px] shrink-0 gap-2 rounded-none border-b-4 border-transparent bg-transparent px-1 pb-4 text-base font-bold text-muted-foreground/50 shadow-none transition-all data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
                 <Icon className="h-4 w-4" /> {label}
               </TabsTrigger>
