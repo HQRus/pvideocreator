@@ -290,7 +290,13 @@ const STARTERS = [
   "TikTok hook — fashion",
 ];
 
-function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
+function ChatPanel({
+  onPatch,
+  assets,
+}: {
+  onPatch: (patch: ProjectPatch) => void;
+  assets: ProjectAsset[];
+}) {
   const [input, setInput] = useState("");
   const [outgoing, setOutgoing] = useState<{ text: string; id: number } | null>(null);
   const outgoingIdRef = useRef(0);
@@ -430,6 +436,7 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
                 key={activeCard.key}
                 html={activeCard.html}
                 onAnswer={handleCardAnswer}
+                assets={assets}
               />
             </div>
           )}
