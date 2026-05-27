@@ -1,68 +1,41 @@
-# Make Cards Truly Generative
+## Goal
 
-Goal: cards can use any reasonable input type, return typed answers, embed media, call tools, and stay live across turns. Delivered in 5 phases so the app keeps working between each.
+Let Reelable's chat call Pika's video models through Pika's remote MCP server (`https://mcp.pika.me/api/mcp`). When the director decides "generate a 5s clip of X," it calls a Pika MCP tool, the resulting video URL is attached as a project asset, and it shows up in the chat + Assets strip just like generated images do today.
 
-## Phase 1 — Typed answer channel (foundation)
+## Approach: shared workspace connection
 
-Today every answer is stringified into `"key: value"`. This blocks numbers, arrays, files, structured picks. Fix this first; everything else builds on it.
+The app currently has no user auth. Rather than introducing accounts just for this, we treat Pika as a single shared connection for the whole studio: one OAuth flow, one set of tokens stored server-side, used for every chat turn. (We can split it per-user later if you add auth.) If you'd rather each visitor connect their own Pika account, say so and I'll switch to a per-session/per-user model.
 
-- Replace the FormData stringifier in `src/components/studio/generative-card.tsx` with a typed collector that returns `{ kind: "answer", title, payload }` where `payload` is a JSON-serializable object.
-- Buttons emit `{ value: string }`. Forms emit a real object (numbers stay numbers, multi-select stays array, files become `{ url, mime, name }` after upload).
-- Send typed payload back through the chat as a hidden JSON block on the user message, alongside a short human summary (so the transcript stays readable and the model gets clean data).
-- Update `SYSTEM_PROMPT` in `src/routes/api/chat.ts` so the model knows answers arrive as structured JSON, not string soup.
+## What gets built
 
-## Phase 2 — Uploads, capture, media preview
+1. **Enable Lovable Cloud** — needed to persist OAuth tokens + dynamic client registration across server restarts. One small `pika_connection` table (singleton row: tokens, refresh token, expires_at, client registration JSON).
+2. **MCP client + auth provider** (`src/lib/pika-mcp.server.ts`)
+   - Uses `@ai-sdk/mcp` `createMCPClient` with HTTP transport against `https://mcp.pika.me/api/mcp`.
+   - Implements the AI SDK `OAuthClientProvider` interface: load/save tokens, load/save dynamic client registration, capture authorization URL, redirect URL points at our callback.
+   - Serves `/.well-known/oauth-client` with our client metadata (HTTPS only — Lovable preview/published URLs are HTTPS).
+3. **Server routes**
+   - `POST /api/pika/connect` → opens a probe MCP client; if it needs auth, returns `{ state: "authenticating", authUrl }`; if it already has tokens, returns `{ state: "ready" }`.
+   - `GET  /api/pika/status` → returns `{ state }` so the UI can show Connect / Connected.
+   - `GET  /api/pika/oauth/callback` → completes the OAuth code exchange, persists tokens, shows a small "Connected — you can close this tab" page.
+   - `POST /api/pika/disconnect` → wipes the row.
+4. **Chat wiring** (`src/routes/api/chat.ts`)
+   - On each request, if Pika is `ready`, open a short-lived MCP client, call `client.tools()`, namespace them under `pika_*`, and merge into the existing tool map alongside `generate_image` / `search_stock_media` / `commit_project_patch`.
+   - Always close the client in `onFinish` and on error.
+   - Bump `stepCountIs` accordingly (already at 50+).
+5. **Result handling** — extend the existing tool-output sweep in `studio.tsx` to detect Pika tool outputs that contain a video URL and `onPatch({ assetsAppend: [{ kind: "video", mime: "video/mp4", url, … }] })`. The Assets strip + chat bubble already render video assets.
+6. **Director prompt update** — short addition to `SYSTEM_PROMPT` telling Reelable that Pika tools exist for actual video generation (and image/audio gen too if exposed), and when to use them vs the existing image tool.
+7. **Connect UI** — small "Connect Pika" pill in the studio header (next to Share/Export). Shows Connect / Connecting… / Connected. Clicking opens the Pika OAuth URL in a new tab, polls `/api/pika/status` until `ready`.
 
-Unblocks: selfie, brand logo, reference image, voice sample, reference track, stock clip preview.
+## Things I'll explicitly *not* do unless you ask
 
-- Enable Lovable Cloud, add a `card-uploads` storage bucket (per-session prefix, signed URLs).
-- New card primitive: `<input type="file" data-upload accept="...">` plus a `<button data-action="capture" data-capture="camera|mic">` for in-browser capture via `getUserMedia`.
-- Card runtime intercepts these: uploads to bucket, swaps the field value for `{ url, mime, name, width?, height?, duration? }` before sending.
-- Allow `<img>`, `<audio>`, `<video>` in DOMPurify config with a strict src allowlist (our bucket + a small set of known CDNs). Add Tailwind classes for media (`aspect-square`, `object-cover`, `rounded-2xl` already allowed).
-- Extend `ProjectMeta` with `assets: { id, kind, url, label, attachedTo? }[]` and surface them in the right panel (likeness → Cast, audio refs → Audio, brand → an Overview slot).
-- Teach `SYSTEM_PROMPT` an "asset request" card pattern, when to use it (likeness, logo, reference, voice sample), and how to patch the asset into project state.
+- Per-end-user Pika accounts (would require app auth first).
+- Adding non-Pika MCP servers / a generic MCP registry UI.
+- Replacing the existing `generate_image` tool — Pika's image models will be available alongside it, the model picks.
+- Building Pika's "Skills" plugin system (podcasts/explainers/UGC). Those are Claude-desktop-only slash commands; not relevant here.
 
-## Phase 3 — Richer input primitives
+## Open questions
 
-Now that answers are typed, expand the model's input vocabulary.
+1. Shared workspace connection vs per-visitor — confirm shared is fine?
+2. After a clip generates, should it auto-attach to the currently active scene, or just land in the Assets strip for the user/director to place? (Default: land in Assets strip, like images do today.)
 
-- Slider (`type=range`) → number, with live label.
-- Color (`type=color`) and curated swatch grid → hex string.
-- Date / time / datetime-local → ISO string.
-- Multi-select via checkbox grid and `<select multiple>` → array, ordering preserved.
-- Drag-to-reorder list (`data-reorder`) → ordered array of ids.
-- Compare card (`data-compare`) → two-up A/B with a single pick.
-- Autosize textarea for long text (lyrics, VO script).
-- Add a tightly scoped Tailwind addition for these (e.g. slider track, swatch ring) and document each primitive in `SYSTEM_PROMPT` with one short example.
-
-## Phase 4 — Tool calls inside cards
-
-Lets the model actually *do* things, not just ask. Uses AI SDK tools on the server route.
-
-- Convert `src/routes/api/chat.ts` from raw `streamText` text-only to a tool-enabled loop with `stopWhen: stepCountIs(50)`.
-- Initial tool set, all server-side, all with Zod input schemas:
-  - `generate_image` (thumbnail / reference / storyboard frame) → returns `{ url }` via image gen.
-  - `search_stock_media` → returns small list of `{ url, thumb, label }` (start with a stub that returns curated demo assets; swap to a real provider later).
-  - `transcribe_audio` (used on uploaded VO) → returns text.
-  - `commit_project_patch` → replaces today's hidden `<script data-project-patch>` channel with a real tool call (more reliable, validated by Zod).
-- Stream tool activity into the card as it runs (shimmer + result tiles). The model can render a `<div data-tool-result="...">` placeholder that the runtime fills in when the tool finishes.
-
-## Phase 5 — Persistent / re-editable cards
-
-Today a card is frozen after the first answer. Make selected cards stay live.
-
-- Add `data-persistent` to the card root. Persistent cards remain interactive across turns and re-emit answers as the user changes them (debounced).
-- Track persistent card state by stable `data-card-id` so re-renders don't lose user input.
-- Use this for the storyboard tab handoff card (reorder scenes), cast list (rename, add), audio brief (tweak BPM/length).
-
-## Cross-cutting
-
-- **Security**: keep DOMPurify, expand attribute allowlist surgically (`data-upload`, `data-capture`, `data-reorder`, `data-compare`, `data-tool-result`, `data-persistent`, `data-card-id`, media `src` allowlist). Validate every typed answer server-side with Zod before passing to the model. Signed upload URLs only, size + mime caps per kind.
-- **Project panel**: each phase adds matching surfaces (assets strip, tool-result gallery, persistent card mirrors) so the panel keeps reflecting state.
-- **Docs in prompt**: after each phase, extend `SYSTEM_PROMPT` with one example per new primitive and a "when to use" line. Keep the allowlist tight.
-
-## Technical details
-
-Files most affected: `src/components/studio/generative-card.tsx` (runtime + sanitization), `src/routes/api/chat.ts` (prompt + tools), `src/lib/project-state.ts` (assets, persistent card state), `src/routes/studio.tsx` (panel surfaces, chat message rendering of typed answers). New files: `src/lib/card-runtime.ts` (typed answer collector + upload pipeline), `src/lib/card-tools.ts` (AI SDK tool definitions), storage migration for `card-uploads` bucket.
-
-Phases are independently shippable. Phase 1 is a hard prerequisite for 2–5. Phases 2, 3, 4, 5 can otherwise ship in any order after Phase 1.
+If both are fine as-stated I'll start with step 1 (enabling Cloud) and work down.
