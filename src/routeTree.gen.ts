@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
 
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
@@ -28,35 +29,44 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssetIdRoute = ApiAssetIdRouteImport.update({
+  id: '/api/asset/$id',
+  path: '/api/asset/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/studio': typeof StudioRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/asset/$id': typeof ApiAssetIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/studio': typeof StudioRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/asset/$id': typeof ApiAssetIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/studio': typeof StudioRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/asset/$id': typeof ApiAssetIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/studio' | '/api/chat'
+  fullPaths: '/' | '/studio' | '/api/chat' | '/api/asset/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/studio' | '/api/chat'
-  id: '__root__' | '/' | '/studio' | '/api/chat'
+  to: '/' | '/studio' | '/api/chat' | '/api/asset/$id'
+  id: '__root__' | '/' | '/studio' | '/api/chat' | '/api/asset/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StudioRoute: typeof StudioRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiAssetIdRoute: typeof ApiAssetIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/asset/$id': {
+      id: '/api/asset/$id'
+      path: '/api/asset/$id'
+      fullPath: '/api/asset/$id'
+      preLoaderRoute: typeof ApiAssetIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StudioRoute: StudioRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiAssetIdRoute: ApiAssetIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
