@@ -236,20 +236,24 @@ function ChatPanel() {
       </div>
 
       <Conversation className="flex-1">
-        <ConversationContent className="px-4">
+        <ConversationContent className="gap-6 px-6 py-8">
           {messages.length === 0 ? (
             <ConversationEmptyState
-              className="px-2"
-              icon={<ReelableMark className="h-10 w-10" />}
-              title="What are we making?"
-              description="Type anything — even one word. I'll generate the next step as something you can click."
+              className="gap-6 px-4 py-12"
+              icon={<ReelableMark className="h-14 w-14" />}
+              title={
+                <span className="font-display text-3xl tracking-tight">
+                  What are we making?
+                </span>
+              }
+              description="Type one word. I'll do the rest."
             >
-              <div className="mt-4 flex w-full flex-col gap-1.5">
+              <div className="mt-6 flex w-full flex-col gap-2.5">
                 {STARTERS.map((s) => (
                   <button
                     key={s}
                     onClick={() => handleSend(s)}
-                    className="rounded-lg border border-border bg-card/40 px-3 py-2 text-left text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+                    className="rounded-2xl border border-border bg-card px-5 py-4 text-left text-base font-medium text-foreground shadow-elegant transition hover:border-primary/50 hover:shadow-glow"
                   >
                     {s}
                   </button>
