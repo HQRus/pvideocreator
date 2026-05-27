@@ -686,7 +686,7 @@ function StructurePanel({
           />
         </TabsContent>
 
-        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto p-8">
+        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
             {scenes.length === 0 && (
               <EmptyHint icon={<Film className="h-8 w-8" />} text="Scenes will appear as you build out the storyboard." />
@@ -708,7 +708,7 @@ function StructurePanel({
           </div>
         </TabsContent>
 
-        <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto p-8">
+        <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
             {cast.length === 0 && (
               <EmptyHint icon={<Users className="h-8 w-8" />} text="No cast yet — ask the director to suggest characters." />
@@ -748,7 +748,7 @@ function StructurePanel({
           </div>
         </TabsContent>
 
-        <TabsContent value="music" className="m-0 flex-1 overflow-y-auto p-8">
+        <TabsContent value="music" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           {!music ? (
             <EmptyHint icon={<Music2 className="h-8 w-8" />} text="No audio yet — describe the music, voiceover, or sound design you want." />
           ) : (
