@@ -59,7 +59,7 @@ export async function deleteConnection(): Promise<void> {
 
 function buildClientMetadata(redirectUri: string): OAuthClientMetadata {
   return {
-    client_name: "Reelable Studio",
+    client_name: "AI Video Director",
     redirect_uris: [redirectUri],
     grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],
@@ -234,7 +234,7 @@ export async function openPikaMCPClient(redirectUri: string) {
       url: PIKA_MCP_URL,
       authProvider: provider,
     },
-    clientName: "reelable-studio",
+    clientName: "ai-video-director",
     version: "0.1.0",
   });
 }
