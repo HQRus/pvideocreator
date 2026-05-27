@@ -28,11 +28,11 @@ async function gatewayGenerateImage(
         "Lovable-API-Key": apiKey,
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-image-preview",
+        model: "openai/gpt-image-2",
         prompt,
         n: 1,
         size: "1024x1024",
-        response_format: "b64_json",
+        quality: "low",
       }),
     },
   );
