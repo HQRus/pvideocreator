@@ -681,8 +681,8 @@ function StructurePanel({
               "Your video's overview will appear here and evolve as you make decisions in the chat."}
           </p>
         </div>
-        <div className="mt-6 border-b-2 border-border/40 px-8 pb-0">
-          <TabsList className="h-auto w-full justify-start gap-8 rounded-none bg-transparent p-0">
+        <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
+          <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
             {[
               { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
               { v: "scenes", icon: Film, label: "Scenes" },
@@ -692,7 +692,7 @@ function StructurePanel({
               <TabsTrigger
                 key={v}
                 value={v}
-                className="-mb-[2px] gap-2 rounded-none border-b-4 border-transparent bg-transparent px-1 pb-4 text-lg font-bold text-muted-foreground/50 shadow-none transition-all data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="-mb-[2px] shrink-0 gap-2 rounded-none border-b-4 border-transparent bg-transparent px-1 pb-4 text-base font-bold text-muted-foreground/50 shadow-none transition-all data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
                 <Icon className="h-4 w-4" /> {label}
               </TabsTrigger>
