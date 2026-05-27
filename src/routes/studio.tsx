@@ -21,11 +21,6 @@ import {
   Maximize2,
   FolderOpen,
 } from "lucide-react";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Conversation,
@@ -75,6 +70,7 @@ function Studio() {
   const [activeSceneId, setActiveSceneId] = useState<string>(
     INITIAL_PROJECT.scenes[0]?.id ?? "",
   );
+  const [panelOpen, setPanelOpen] = useState(true);
   const { scenes, cast, music, meta } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
@@ -86,21 +82,26 @@ function Studio() {
     setProject((prev) => ({ ...prev, scenes: next }));
 
   return (
-    <div className="flex h-screen w-full bg-background text-foreground">
-      <GalleryRail />
+    <div className="relative flex h-screen w-full overflow-hidden bg-background text-foreground">
+      <FloatingGallery />
       <div className="flex min-w-0 flex-1 flex-col">
         <StudioTopBar
           meta={meta}
           duration={totalDuration}
           sceneCount={scenes.length}
+          panelOpen={panelOpen}
+          onTogglePanel={() => setPanelOpen((o) => !o)}
         />
-        <div className="flex-1 overflow-hidden border-t border-border/60">
-          <ResizablePanelGroup orientation="horizontal" className="h-full">
-            <ResizablePanel defaultSize={67} minSize={40} className="bg-sidebar/30">
-              <ChatPanel onPatch={handlePatch} />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={33} minSize={22}>
+        <div className="flex min-h-0 flex-1 border-t border-border/60">
+          <div className="min-w-0 flex-1 bg-sidebar/30">
+            <ChatPanel onPatch={handlePatch} />
+          </div>
+          <aside
+            className={`shrink-0 overflow-hidden border-l border-border/60 bg-background transition-[width] duration-300 ease-out ${
+              panelOpen ? "w-[440px]" : "w-0"
+            }`}
+          >
+            <div className="h-full w-[440px]">
               <StructurePanel
                 scenes={scenes}
                 setScenes={setScenes}
@@ -110,10 +111,20 @@ function Studio() {
                 onSelect={setActiveSceneId}
                 totalDuration={totalDuration}
               />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+            </div>
+          </aside>
         </div>
       </div>
+
+      {!panelOpen && (
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="absolute right-4 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant transition hover:text-foreground"
+          aria-label="Open project panel"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -128,11 +139,11 @@ const GALLERY_PROJECTS = [
   { id: "p5", title: "Late Bloom", meta: "Music video · 9:16", thumb: sample2 },
 ];
 
-function GalleryRail() {
+function FloatingGallery() {
   const [open, setOpen] = useState(false);
   return (
     <aside
-      className={`relative flex h-full shrink-0 flex-col border-r border-border/60 bg-sidebar/60 transition-all duration-300 ${
+      className={`pointer-events-auto absolute left-4 top-4 bottom-4 z-30 flex flex-col rounded-3xl border border-border/60 bg-card/80 shadow-elegant backdrop-blur-xl transition-all duration-300 ${
         open ? "w-72" : "w-16"
       }`}
     >
@@ -219,13 +230,17 @@ function StudioTopBar({
   meta,
   duration,
   sceneCount,
+  panelOpen,
+  onTogglePanel,
 }: {
   meta: { title: string; format: string; aspectRatio: string };
   duration: number;
   sceneCount: number;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 px-4">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 pl-24 pr-4">
       <div className="flex items-center gap-3">
         <Link to="/" className="text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" />
@@ -238,17 +253,13 @@ function StudioTopBar({
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" className="gap-1.5">
-          <Share2 className="h-3.5 w-3.5" /> Share
-        </Button>
-        <Button variant="ghost" size="sm" className="gap-1.5">
-          <Download className="h-3.5 w-3.5" /> Export
-        </Button>
-        <button className="ml-1 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-glow transition hover:opacity-95">
-          <Wand2 className="h-3.5 w-3.5" /> Render
-        </button>
-      </div>
+      <button
+        onClick={onTogglePanel}
+        className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label={panelOpen ? "Collapse project panel" : "Open project panel"}
+      >
+        {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
     </header>
   );
 }
@@ -645,7 +656,7 @@ function StructurePanel({
   totalDuration: number;
 }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
         <div className="border-b-2 border-border/40 px-8 pt-8 pb-0">
           <TabsList className="h-auto w-full justify-start gap-8 rounded-none bg-transparent p-0">
@@ -675,7 +686,7 @@ function StructurePanel({
           />
         </TabsContent>
 
-        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto p-8">
+        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
             {scenes.length === 0 && (
               <EmptyHint icon={<Film className="h-8 w-8" />} text="Scenes will appear as you build out the storyboard." />
@@ -697,7 +708,7 @@ function StructurePanel({
           </div>
         </TabsContent>
 
-        <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto p-8">
+        <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
             {cast.length === 0 && (
               <EmptyHint icon={<Users className="h-8 w-8" />} text="No cast yet — ask the director to suggest characters." />
@@ -737,7 +748,7 @@ function StructurePanel({
           </div>
         </TabsContent>
 
-        <TabsContent value="music" className="m-0 flex-1 overflow-y-auto p-8">
+        <TabsContent value="music" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           {!music ? (
             <EmptyHint icon={<Music2 className="h-8 w-8" />} text="No audio yet — describe the music, voiceover, or sound design you want." />
           ) : (
@@ -794,6 +805,21 @@ function StructurePanel({
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Floating sticky action bar */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
+        <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
+          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-border/60 bg-background py-4 text-base font-bold tracking-tight text-foreground transition hover:border-foreground/40">
+            <Share2 className="h-4 w-4" /> Share
+          </button>
+          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-border/60 bg-background py-4 text-base font-bold tracking-tight text-foreground transition hover:border-foreground/40">
+            <Download className="h-4 w-4" /> Export
+          </button>
+          <button className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95">
+            <Wand2 className="h-4 w-4" /> Render
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
