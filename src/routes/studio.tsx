@@ -325,12 +325,10 @@ function ChatPanel() {
     <div className="flex h-full flex-col">
       <Conversation className="flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
-          {history.length === 0 && !activeCard && !busy && (
-            <div className="flex flex-col items-start gap-6 pt-6">
-              <ReelableMark className="h-12 w-12" />
-              <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
-            </div>
-          )}
+          <div className="flex flex-col items-start gap-6 pt-6">
+            <ReelableMark className="h-12 w-12" />
+            <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
+          </div>
           {history.map((it) =>
             it.kind === "user" ? (
               <UserBubble key={it.key} text={it.text} />
