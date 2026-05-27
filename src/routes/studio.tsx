@@ -429,7 +429,7 @@ function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
               <GenerativeCard
                 key={activeCard.key}
                 html={activeCard.html}
-                onAnswer={handleSend}
+                onAnswer={handleCardAnswer}
               />
             </div>
           )}
