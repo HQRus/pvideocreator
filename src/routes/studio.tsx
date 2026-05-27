@@ -59,6 +59,10 @@ import {
   type ProjectState,
   type Scene,
 } from "@/lib/project-state";
+import sample1 from "@/assets/sample-1.jpg";
+import sample2 from "@/assets/sample-2.jpg";
+import sample3 from "@/assets/sample-3.jpg";
+import sample4 from "@/assets/sample-4.jpg";
 
 export const Route = createFileRoute("/studio")({
   component: Studio,
@@ -211,7 +215,15 @@ function GalleryRail() {
 
 // ---------- top bar ----------
 
-function StudioTopBar({ duration, sceneCount }: { duration: number; sceneCount: number }) {
+function StudioTopBar({
+  meta,
+  duration,
+  sceneCount,
+}: {
+  meta: { title: string; format: string; aspectRatio: string };
+  duration: number;
+  sceneCount: number;
+}) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-4 px-4">
       <div className="flex items-center gap-3">
@@ -220,9 +232,9 @@ function StudioTopBar({ duration, sceneCount }: { duration: number; sceneCount: 
         </Link>
         <ReelableMark className="h-7 w-7" />
         <div className="flex flex-col leading-tight">
-          <span className="text-sm font-medium">Neon Drift</span>
+          <span className="text-sm font-medium">{meta.title}</span>
           <span className="text-[11px] text-muted-foreground">
-            Music video · 9:16 · {sceneCount} scenes · {formatDuration(duration)}
+            {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
           </span>
         </div>
       </div>
