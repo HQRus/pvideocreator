@@ -268,7 +268,7 @@ const STARTERS = [
   "TikTok hook — fashion",
 ];
 
-function ChatPanel() {
+function ChatPanel({ onPatch }: { onPatch: (patch: ProjectPatch) => void }) {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
@@ -288,6 +288,21 @@ function ChatPanel() {
       .map((p) => (p.type === "text" ? p.text : ""))
       .join("")
       .trim();
+
+  // Apply project patches embedded in any assistant message exactly once.
+  const appliedPatchIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const m of messages) {
+      if (m.role !== "assistant") continue;
+      if (appliedPatchIds.current.has(m.id)) continue;
+      const patch = extractProjectPatch(textOf(m));
+      if (patch) {
+        appliedPatchIds.current.add(m.id);
+        onPatch(patch as ProjectPatch);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   // History items = everything that's "decided". The most recent assistant
   // card (if not yet answered) is the *active* card, rendered anchored
