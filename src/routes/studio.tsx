@@ -82,9 +82,9 @@ function Studio() {
     setProject((prev) => ({ ...prev, scenes: next }));
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-background text-foreground">
-      <FloatingGallery />
-      <div className="flex min-w-0 flex-1 flex-col">
+    <div className="relative h-screen w-full overflow-hidden bg-background text-foreground">
+      {/* Centered chat fills the screen; gallery & project panel float over it */}
+      <div className="absolute inset-0 flex flex-col">
         <StudioTopBar
           meta={meta}
           duration={totalDuration}
@@ -92,35 +92,36 @@ function Studio() {
           panelOpen={panelOpen}
           onTogglePanel={() => setPanelOpen((o) => !o)}
         />
-        <div className="flex min-h-0 flex-1 border-t border-border/60">
-          <div className="min-w-0 flex-1 bg-sidebar/30">
-            <ChatPanel onPatch={handlePatch} />
-          </div>
-          <aside
-            className={`shrink-0 overflow-hidden border-l border-border/60 bg-background transition-[width] duration-300 ease-out ${
-              panelOpen ? "w-[440px]" : "w-0"
-            }`}
-          >
-            <div className="h-full w-[440px]">
-              <StructurePanel
-                meta={meta}
-                scenes={scenes}
-                setScenes={setScenes}
-                cast={cast}
-                music={music}
-                activeSceneId={activeSceneId}
-                onSelect={setActiveSceneId}
-                totalDuration={totalDuration}
-              />
-            </div>
-          </aside>
+        <div className="min-h-0 flex-1">
+          <ChatPanel onPatch={handlePatch} />
         </div>
       </div>
+
+      <FloatingGallery />
+
+      <aside
+        className={`pointer-events-auto absolute right-4 top-4 bottom-4 z-30 overflow-hidden rounded-3xl bg-card shadow-elegant transition-[width,opacity] duration-300 ease-out ${
+          panelOpen ? "w-[440px] opacity-100" : "w-0 opacity-0"
+        }`}
+      >
+        <div className="h-full w-[440px]">
+          <StructurePanel
+            meta={meta}
+            scenes={scenes}
+            setScenes={setScenes}
+            cast={cast}
+            music={music}
+            activeSceneId={activeSceneId}
+            onSelect={setActiveSceneId}
+            totalDuration={totalDuration}
+          />
+        </div>
+      </aside>
 
       {!panelOpen && (
         <button
           onClick={() => setPanelOpen(true)}
-          className="absolute right-4 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-elegant transition hover:text-foreground"
+          className="absolute right-4 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-card text-muted-foreground shadow-elegant transition hover:text-foreground"
           aria-label="Open project panel"
         >
           <ChevronLeft className="h-4 w-4" />
