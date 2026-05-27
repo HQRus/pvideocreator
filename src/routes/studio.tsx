@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import symbolLogo from "@/assets/symbol.svg";
 import {
   Play,
   Pause,
