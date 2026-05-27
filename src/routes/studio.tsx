@@ -737,11 +737,7 @@ function StructurePanel({
     <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
         <div className="px-8 pt-8">
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
-            {meta.format && meta.format !== "—" ? meta.format : "New project"}
-            {meta.aspectRatio && meta.aspectRatio !== "—" ? ` · ${meta.aspectRatio}` : ""}
-          </div>
-          <h2 className="mt-2 font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground">
+          <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground">
             {meta.title}
           </h2>
           <p className="mt-3 text-base leading-relaxed text-muted-foreground">
