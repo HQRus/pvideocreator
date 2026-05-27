@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Play,
   Pause,
