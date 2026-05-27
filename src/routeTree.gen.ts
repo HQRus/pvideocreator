@@ -16,6 +16,7 @@ import { Route as ApiPikaStatusRouteImport } from './routes/api/pika/status'
 import { Route as ApiPikaDisconnectRouteImport } from './routes/api/pika/disconnect'
 import { Route as ApiPikaConnectRouteImport } from './routes/api/pika/connect'
 import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
+import { Route as ApiPikaOauthCallbackRouteImport } from './routes/api/pika/oauth.callback'
 
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
@@ -52,6 +53,11 @@ const ApiAssetIdRoute = ApiAssetIdRouteImport.update({
   path: '/api/asset/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPikaOauthCallbackRoute = ApiPikaOauthCallbackRouteImport.update({
+  id: '/api/pika/oauth/callback',
+  path: '/api/pika/oauth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/disconnect': typeof ApiPikaDisconnectRoute
   '/api/pika/status': typeof ApiPikaStatusRoute
+  '/api/pika/oauth/callback': typeof ApiPikaOauthCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/disconnect': typeof ApiPikaDisconnectRoute
   '/api/pika/status': typeof ApiPikaStatusRoute
+  '/api/pika/oauth/callback': typeof ApiPikaOauthCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/disconnect': typeof ApiPikaDisconnectRoute
   '/api/pika/status': typeof ApiPikaStatusRoute
+  '/api/pika/oauth/callback': typeof ApiPikaOauthCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/api/pika/connect'
     | '/api/pika/disconnect'
     | '/api/pika/status'
+    | '/api/pika/oauth/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/api/pika/connect'
     | '/api/pika/disconnect'
     | '/api/pika/status'
+    | '/api/pika/oauth/callback'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/api/pika/connect'
     | '/api/pika/disconnect'
     | '/api/pika/status'
+    | '/api/pika/oauth/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   ApiPikaConnectRoute: typeof ApiPikaConnectRoute
   ApiPikaDisconnectRoute: typeof ApiPikaDisconnectRoute
   ApiPikaStatusRoute: typeof ApiPikaStatusRoute
+  ApiPikaOauthCallbackRoute: typeof ApiPikaOauthCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssetIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pika/oauth/callback': {
+      id: '/api/pika/oauth/callback'
+      path: '/api/pika/oauth/callback'
+      fullPath: '/api/pika/oauth/callback'
+      preLoaderRoute: typeof ApiPikaOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPikaConnectRoute: ApiPikaConnectRoute,
   ApiPikaDisconnectRoute: ApiPikaDisconnectRoute,
   ApiPikaStatusRoute: ApiPikaStatusRoute,
+  ApiPikaOauthCallbackRoute: ApiPikaOauthCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
