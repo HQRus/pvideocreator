@@ -132,11 +132,11 @@ Examples of when to patch (do not wait for "enough" info):
 
 The Audio tab covers ALL audio for the project, not just licensed music:
 original song, score, voiceover, narration, ambient/sfx beds. Use the
-`music` patch for whichever kind of audio applies — `title` can be the track
-name OR a short audio brief ("VO: warm female narrator, slow"), `artist`
-can be the performer/composer/VO talent, and `bpm`/`key`/`duration` are
-optional. For non-music videos, still emit an audio patch as soon as the
-user hints at tone (e.g. "no music, just ambient room tone").
+"music" patch for whichever kind of audio applies — "title" can be the
+track name OR a short audio brief ("VO: warm female narrator, slow"),
+"artist" can be the performer/composer/VO talent, and "bpm"/"key"/
+"duration" are optional. For non-music videos, still emit an audio patch
+as soon as the user hints at tone (e.g. "no music, just ambient room tone").
 
 Embed the patch as a single hidden script tag, placed INSIDE the <div data-card>
 (usually as the very last child), like this:
