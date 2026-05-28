@@ -1121,6 +1121,7 @@ function StructurePanel({
   activeSceneId,
   onSelect,
   totalDuration,
+  onChatCommand,
 }: {
   projectId: string;
   meta: {
@@ -1140,31 +1141,45 @@ function StructurePanel({
   activeSceneId: string;
   onSelect: (id: string) => void;
   totalDuration: number;
+  onChatCommand?: (text: string) => void;
 }) {
-  const startRenderFn = useServerFn(startRender);
-  const [rendering, setRendering] = useState(false);
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
-  const onRender = async () => {
-    if (rendering) return;
+  void projectId; // reserved for future direct panel actions
+  const missingKeyframes = scenes.filter((s) => !s.thumb).length;
+  const missingClips = scenes.filter((s) => !s.clipUrl).length;
+  const onGenerateKeyframes = () => {
     if (scenes.length === 0) {
-      setRenderMsg("Add at least one scene first.");
+      setRenderMsg("Draft at least one scene first — describe the concept in chat.");
       return;
     }
-    setRendering(true);
-    setRenderMsg("Generating keyframes…");
-    try {
-      const r = await startRenderFn({ data: { projectId } });
-      setRenderMsg(
-        r.failCount === 0
-          ? `Rendered ${r.okCount} keyframe${r.okCount === 1 ? "" : "s"}.`
-          : `${r.okCount} ok, ${r.failCount} failed.`,
-      );
-    } catch (e) {
-      setRenderMsg(e instanceof Error ? e.message : "Render failed.");
-    } finally {
-      setRendering(false);
-    }
+    setRenderMsg("Asked the director to generate keyframes.");
+    onChatCommand?.(
+      `GENERATE KEYFRAMES NOW for every scene that doesn't already have one. ` +
+      `For each such scene, call the generate_image tool with a vivid, cinematic prompt that bakes in: ` +
+      `(1) the project logline, (2) the scene title + scene prompt, (3) the cast notes & any uploaded ` +
+      `likeness/reference assets, and (4) a consistent visual style across all keyframes. ` +
+      `After each image returns, emit a commit_project_patch that updates scenes[i].thumb to the new ` +
+      `asset URL (and sets status to "ready"). Do all scenes in this turn. Final card: a short handoff ` +
+      `confirming how many keyframes were generated.`,
+    );
   };
+  const onGoToProduction = () => {
+    if (scenes.length === 0) {
+      setRenderMsg("Draft at least one scene first.");
+      return;
+    }
+    setRenderMsg("Asked the director to render scenes via Pika.");
+    onChatCommand?.(
+      `GO TO PRODUCTION. Render every scene that doesn't already have a clipUrl into an actual video clip ` +
+      `using the available pika_* tools (prefer pika_generate_keyframes_video when a keyframe exists, ` +
+      `otherwise pika_generate_video). For each scene pass: the keyframe image (asset URL) as the starting ` +
+      `frame when supported, the scene's motionPrompt (or scene prompt as fallback) as the motion/camera ` +
+      `direction, and the scene duration. As each clip returns, emit a commit_project_patch updating ` +
+      `scenes[i].clipUrl and scenes[i].status. If no pika_* tools are available, tell the user the Pika ` +
+      `connection is missing. Final card: a short handoff listing which scenes rendered successfully.`,
+    );
+  };
+  const rendering = false;
   return (
     <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
