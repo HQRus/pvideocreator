@@ -1345,18 +1345,29 @@ function StructurePanel({
       {/* Floating sticky action bar */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
-            Share
-          </button>
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
-            Export
+          <button
+            onClick={onGenerateKeyframes}
+            disabled={rendering}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-sm font-bold tracking-tight text-foreground transition hover:bg-muted disabled:opacity-60"
+            title={
+              missingKeyframes > 0
+                ? `${missingKeyframes} scene${missingKeyframes === 1 ? "" : "s"} missing a keyframe`
+                : "All scenes have keyframes"
+            }
+          >
+            Keyframes{missingKeyframes > 0 ? ` · ${missingKeyframes}` : ""}
           </button>
           <button
-            onClick={onRender}
+            onClick={onGoToProduction}
             disabled={rendering}
-            className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
+            className="flex flex-[1.6] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
+            title={
+              missingClips > 0
+                ? `${missingClips} scene${missingClips === 1 ? "" : "s"} not yet rendered`
+                : "All scenes rendered"
+            }
           >
-            {rendering ? "Rendering…" : "Render"}
+            Go to production{missingClips > 0 ? ` · ${missingClips}` : ""}
           </button>
         </div>
         {renderMsg && (
