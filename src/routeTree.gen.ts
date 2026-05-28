@@ -13,11 +13,11 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as AuthenticatedStudioRouteImport } from './routes/_authenticated/studio'
 import { Route as ApiPikaStatusRouteImport } from './routes/api/pika/status'
 import { Route as ApiPikaDisconnectRouteImport } from './routes/api/pika/disconnect'
 import { Route as ApiPikaConnectRouteImport } from './routes/api/pika/connect'
 import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
-import { Route as AuthenticatedStudioProjectIdRouteImport } from './routes/_authenticated/studio.$projectId'
 import { Route as ApiPikaOauthCallbackRouteImport } from './routes/api/pika/oauth.callback'
 
 const LoginRoute = LoginRouteImport.update({
@@ -39,6 +39,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedStudioRoute = AuthenticatedStudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const ApiPikaStatusRoute = ApiPikaStatusRouteImport.update({
   id: '/api/pika/status',
   path: '/api/pika/status',
@@ -59,12 +64,6 @@ const ApiAssetIdRoute = ApiAssetIdRouteImport.update({
   path: '/api/asset/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedStudioProjectIdRoute =
-  AuthenticatedStudioProjectIdRouteImport.update({
-    id: '/studio/$projectId',
-    path: '/studio/$projectId',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const ApiPikaOauthCallbackRoute = ApiPikaOauthCallbackRouteImport.update({
   id: '/api/pika/oauth/callback',
   path: '/api/pika/oauth/callback',
@@ -74,8 +73,8 @@ const ApiPikaOauthCallbackRoute = ApiPikaOauthCallbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/studio': typeof AuthenticatedStudioRoute
   '/api/chat': typeof ApiChatRoute
-  '/studio/$projectId': typeof AuthenticatedStudioProjectIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
   '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/disconnect': typeof ApiPikaDisconnectRoute
@@ -85,8 +84,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/studio': typeof AuthenticatedStudioRoute
   '/api/chat': typeof ApiChatRoute
-  '/studio/$projectId': typeof AuthenticatedStudioProjectIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
   '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/disconnect': typeof ApiPikaDisconnectRoute
@@ -98,8 +97,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/studio': typeof AuthenticatedStudioRoute
   '/api/chat': typeof ApiChatRoute
-  '/_authenticated/studio/$projectId': typeof AuthenticatedStudioProjectIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
   '/api/pika/connect': typeof ApiPikaConnectRoute
   '/api/pika/disconnect': typeof ApiPikaDisconnectRoute
@@ -111,8 +110,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/studio'
     | '/api/chat'
-    | '/studio/$projectId'
     | '/api/asset/$id'
     | '/api/pika/connect'
     | '/api/pika/disconnect'
@@ -122,8 +121,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/studio'
     | '/api/chat'
-    | '/studio/$projectId'
     | '/api/asset/$id'
     | '/api/pika/connect'
     | '/api/pika/disconnect'
@@ -134,8 +133,8 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/studio'
     | '/api/chat'
-    | '/_authenticated/studio/$projectId'
     | '/api/asset/$id'
     | '/api/pika/connect'
     | '/api/pika/disconnect'
@@ -185,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/studio': {
+      id: '/_authenticated/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof AuthenticatedStudioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/pika/status': {
       id: '/api/pika/status'
       path: '/api/pika/status'
@@ -213,13 +219,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssetIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/studio/$projectId': {
-      id: '/_authenticated/studio/$projectId'
-      path: '/studio/$projectId'
-      fullPath: '/studio/$projectId'
-      preLoaderRoute: typeof AuthenticatedStudioProjectIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/api/pika/oauth/callback': {
       id: '/api/pika/oauth/callback'
       path: '/api/pika/oauth/callback'
@@ -231,11 +230,11 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedStudioProjectIdRoute: typeof AuthenticatedStudioProjectIdRoute
+  AuthenticatedStudioRoute: typeof AuthenticatedStudioRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedStudioProjectIdRoute: AuthenticatedStudioProjectIdRoute,
+  AuthenticatedStudioRoute: AuthenticatedStudioRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
