@@ -517,19 +517,41 @@ export const Route = createFileRoute("/api/chat")({
             execute: async ({ prompt, kind, label }) => {
               try {
                 const { b64, mime } = await gatewayGenerateImage(prompt, key);
-                const id = nextToolAssetId();
-                // Stash bytes server-side; only stream a short URL through
-                // the model context (base64 in tool results blows past the
-                // token limit on the next step).
-                putAsset(id, mime, base64ToBytes(b64));
-                return {
-                  id,
-                  kind: kind ?? "reference",
-                  mime,
-                  name: (label ?? prompt.slice(0, 40)) + ".png",
-                  url: `/api/asset/${id}`,
-                  label,
-                };
+                const bytes = base64ToBytes(b64);
+                // Persist durably so the asset survives page reload.
+                try {
+                  const stored = await storeAsset({
+                    projectId,
+                    userId,
+                    kind: kind ?? "reference",
+                    mime,
+                    bytes,
+                    label,
+                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                  });
+                  return {
+                    id: stored.id,
+                    kind: kind ?? "reference",
+                    mime,
+                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                    url: stored.url,
+                    label,
+                  };
+                } catch (e) {
+                  // Fall back to in-memory cache so the current turn still
+                  // works even if storage upload fails.
+                  console.error("[chat] storeAsset failed, falling back:", e);
+                  const id = nextToolAssetId();
+                  putAsset(id, mime, bytes);
+                  return {
+                    id,
+                    kind: kind ?? "reference",
+                    mime,
+                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                    url: `/api/asset/${id}`,
+                    label,
+                  };
+                }
               } catch (err) {
                 return {
                   error: err instanceof Error ? err.message : String(err),
