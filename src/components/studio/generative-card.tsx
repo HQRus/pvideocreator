@@ -266,11 +266,13 @@ export function GenerativeCard({
   onAnswer,
   disabled,
   assets,
+  projectId,
 }: {
   html: string;
   onAnswer: (answer: CardAnswer) => void;
   disabled?: boolean;
   assets?: ProjectAsset[];
+  projectId: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const cleaned = stripProjectPatch(stripCardProse(stripCardWrapper(html)));
