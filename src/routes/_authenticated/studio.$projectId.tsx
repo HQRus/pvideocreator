@@ -12,10 +12,9 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
-// startRender is intentionally not used anymore — the chat AI now drives
-// keyframe + production rendering through its tool calls (generate_image
-// for keyframes, pika_* for video). The "Generate keyframes" and "Go to
-// production" buttons send a directive into the chat.
+// "Generate keyframes" still routes through the chat AI (image gen tools).
+// "Go to production" runs the deterministic server pipeline below — no LLM.
+import { startProduction } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
