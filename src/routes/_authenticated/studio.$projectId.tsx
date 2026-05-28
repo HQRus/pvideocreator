@@ -1044,6 +1044,7 @@ function SceneTile({
   onClick: () => void;
 }) {
   const isRendering = scene.status === "rendering";
+  const hasClip = !!scene.clipUrl;
   return (
     <button
       onClick={onClick}
@@ -1054,7 +1055,19 @@ function SceneTile({
       }`}
     >
       <div className="relative aspect-[9/16] overflow-hidden bg-muted">
-        {scene.thumb ? (
+        {hasClip ? (
+          <video
+            src={scene.clipUrl}
+            className="h-full w-full object-cover"
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            onMouseEnter={(e) => void (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
+            onMouseLeave={(e) => (e.currentTarget as HTMLVideoElement).pause()}
+            poster={scene.thumb || undefined}
+          />
+        ) : scene.thumb ? (
           <img
             src={scene.thumb}
             alt={scene.title}
