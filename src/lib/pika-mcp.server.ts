@@ -176,6 +176,14 @@ export function callbackUrlFromRequest(req: Request): string {
   return `${scheme}://${host}/api/pika/oauth/callback`;
 }
 
+function extractOAuthState(authUrl: string): string | undefined {
+  try {
+    return new URL(authUrl).searchParams.get("state") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Start (or resume) the OAuth flow. Returns either:
  *   { state: 'ready' }     — tokens already valid, MCP reachable
@@ -184,7 +192,9 @@ export function callbackUrlFromRequest(req: Request): string {
 export async function beginConnect(
   userId: string,
   redirectUri: string,
-): Promise<{ state: "ready" } | { state: "authenticating"; authUrl: string }> {
+): Promise<
+  { state: "ready" } | { state: "authenticating"; authUrl: string; oauthState?: string }
+> {
   const existing = await loadRow(userId);
   const registeredRedirects = Array.isArray(
     (existing?.client_information as { redirect_uris?: unknown } | null)?.redirect_uris,
@@ -215,7 +225,13 @@ export async function beginConnect(
   if (!capture.authUrl) {
     throw new Error("OAuth did not produce an authorization URL");
   }
-  return { state: "authenticating", authUrl: capture.authUrl };
+
+  const oauthState = extractOAuthState(capture.authUrl);
+  if (oauthState) {
+    await upsertRow(userId, { oauth_state: oauthState });
+  }
+
+  return { state: "authenticating", authUrl: capture.authUrl, oauthState };
 }
 
 export async function completeOAuth(
