@@ -14,6 +14,7 @@ import {
   getStatus,
   openPikaMCPClient,
 } from "@/lib/pika-mcp.server";
+import { requireUser, unauthorizedResponse } from "@/lib/auth-route.server";
 
 // ---------- Tool implementations ----------
 
@@ -445,6 +446,14 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        let userId: string;
+        try {
+          ({ userId } = await requireUser(request));
+        } catch (err) {
+          return unauthorizedResponse(
+            err instanceof Error ? err.message : "Unauthorized",
+          );
+        }
         const { messages } = (await request.json()) as ChatRequestBody;
         if (!Array.isArray(messages)) {
           return new Response("Messages are required", { status: 400 });
@@ -523,9 +532,9 @@ export const Route = createFileRoute("/api/chat")({
         // Merge in Pika MCP tools if the workspace has an active connection.
         let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
         try {
-          if ((await getStatus()) === "ready") {
+          if ((await getStatus(userId)) === "ready") {
             const redirectUri = callbackUrlFromRequest(request);
-            pikaClient = await openPikaMCPClient(redirectUri);
+            pikaClient = await openPikaMCPClient(userId, redirectUri);
             const pikaTools = await pikaClient.tools();
             for (const [name, t] of Object.entries(pikaTools)) {
               const key = `pika_${name}`;
