@@ -519,11 +519,24 @@ export const Route = createFileRoute("/api/chat")({
           }),
           commit_project_patch: tool({
             description:
-              "Apply a project patch (same schema as the <script data-project-patch> block) programmatically.",
+              "Apply a project patch (same schema as the <script data-project-patch> block) programmatically. Pass the patch as a JSON-encoded string.",
             inputSchema: z.object({
-              patch: z.record(z.string(), z.unknown()),
+              patch_json: z
+                .string()
+                .min(2)
+                .max(20000)
+                .describe("JSON-encoded project patch object"),
             }),
-            execute: async ({ patch }) => {
+            execute: async ({ patch_json }) => {
+              let patch: unknown;
+              try {
+                patch = JSON.parse(patch_json);
+              } catch (err) {
+                return {
+                  ok: false,
+                  error: err instanceof Error ? err.message : "Invalid JSON",
+                };
+              }
               return { ok: true, patch };
             },
           }),
