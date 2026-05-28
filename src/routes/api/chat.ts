@@ -725,7 +725,7 @@ export const Route = createFileRoute("/api/chat")({
           },
         });
 
-        return result.toUIMessageStreamResponse({
+        const response = result.toUIMessageStreamResponse({
           originalMessages: messages as UIMessage[],
           onError: (error) => {
             console.error("[chat] toUIMessageStreamResponse error:", error);
