@@ -1,41 +1,48 @@
-## Goal
+## Problem
 
-Let Reelable's chat call Pika's video models through Pika's remote MCP server (`https://mcp.pika.me/api/mcp`). When the director decides "generate a 5s clip of X," it calls a Pika MCP tool, the resulting video URL is attached as a project asset, and it shows up in the chat + Assets strip just like generated images do today.
+When the assistant says "rendering your video," there is no way — for you or for me — to verify Pika actually got the request. The chat handler streams 200 either way, no `pika_*` tool input/output is logged, and the studio shimmer just says "Working…" regardless of which tool (if any) is running.
 
-## Approach: shared workspace connection
+## Plan
 
-The app currently has no user auth. Rather than introducing accounts just for this, we treat Pika as a single shared connection for the whole studio: one OAuth flow, one set of tokens stored server-side, used for every chat turn. (We can split it per-user later if you add auth.) If you'd rather each visitor connect their own Pika account, say so and I'll switch to a per-session/per-user model.
+### 1. Server-side: log every Pika tool call
 
-## What gets built
+In `src/routes/api/chat.ts`, wrap each Pika MCP tool when mounting it so we capture:
 
-1. **Enable Lovable Cloud** — needed to persist OAuth tokens + dynamic client registration across server restarts. One small `pika_connection` table (singleton row: tokens, refresh token, expires_at, client registration JSON).
-2. **MCP client + auth provider** (`src/lib/pika-mcp.server.ts`)
-   - Uses `@ai-sdk/mcp` `createMCPClient` with HTTP transport against `https://mcp.pika.me/api/mcp`.
-   - Implements the AI SDK `OAuthClientProvider` interface: load/save tokens, load/save dynamic client registration, capture authorization URL, redirect URL points at our callback.
-   - Serves `/.well-known/oauth-client` with our client metadata (HTTPS only — Lovable preview/published URLs are HTTPS).
-3. **Server routes**
-   - `POST /api/pika/connect` → opens a probe MCP client; if it needs auth, returns `{ state: "authenticating", authUrl }`; if it already has tokens, returns `{ state: "ready" }`.
-   - `GET  /api/pika/status` → returns `{ state }` so the UI can show Connect / Connected.
-   - `GET  /api/pika/oauth/callback` → completes the OAuth code exchange, persists tokens, shows a small "Connected — you can close this tab" page.
-   - `POST /api/pika/disconnect` → wipes the row.
-4. **Chat wiring** (`src/routes/api/chat.ts`)
-   - On each request, if Pika is `ready`, open a short-lived MCP client, call `client.tools()`, namespace them under `pika_*`, and merge into the existing tool map alongside `generate_image` / `search_stock_media` / `commit_project_patch`.
-   - Always close the client in `onFinish` and on error.
-   - Bump `stepCountIs` accordingly (already at 50+).
-5. **Result handling** — extend the existing tool-output sweep in `studio.tsx` to detect Pika tool outputs that contain a video URL and `onPatch({ assetsAppend: [{ kind: "video", mime: "video/mp4", url, … }] })`. The Assets strip + chat bubble already render video assets.
-6. **Director prompt update** — short addition to `SYSTEM_PROMPT` telling Reelable that Pika tools exist for actual video generation (and image/audio gen too if exposed), and when to use them vs the existing image tool.
-7. **Connect UI** — small "Connect Pika" pill in the studio header (next to Share/Export). Shows Connect / Connecting… / Connected. Clicking opens the Pika OAuth URL in a new tab, polls `/api/pika/status` until `ready`.
+- tool name (e.g. `pika_generate_2_2`)
+- truncated input (prompt, duration, aspect)
+- duration of the call
+- truncated output or the error
+- any video URLs `extractVideoAssets` would pick up
 
-## Things I'll explicitly *not* do unless you ask
+These show up in `server-function-logs` so the next time you ask "did it really render?", I can answer in one query.
 
-- Per-end-user Pika accounts (would require app auth first).
-- Adding non-Pika MCP servers / a generic MCP registry UI.
-- Replacing the existing `generate_image` tool — Pika's image models will be available alongside it, the model picks.
-- Building Pika's "Skills" plugin system (podcasts/explainers/UGC). Those are Claude-desktop-only slash commands; not relevant here.
+### 2. Client-side: show which tool is actually running
 
-## Open questions
+In `src/routes/studio.tsx`:
 
-1. Shared workspace connection vs per-visitor — confirm shared is fine?
-2. After a clip generates, should it auto-attach to the currently active scene, or just land in the Assets strip for the user/director to place? (Default: land in Assets strip, like images do today.)
+- Replace the generic `"Working…"` shimmer with a Pika-specific label when the pending tool name starts with `pika_` (e.g. "Rendering with Pika — this usually takes 30-90s").
+- If a `pika_*` tool returns `{ error: ... }` (or returns with no video URLs), render a visible error/empty-state in the chat instead of silently going back to idle. Right now those failures vanish.
 
-If both are fine as-stated I'll start with step 1 (enabling Cloud) and work down.
+### 3. Add a "View raw tool result" affordance (collapsed)
+
+For each `pika_*` tool part on an assistant message, show a small collapsed accordion ("Pika · pika_generate_2_2 · 12.4s") that, when opened, shows input + output JSON. This is the user-visible version of #1 and removes the guesswork next time.
+
+### 4. Verify
+
+After these changes, run a real generation in /studio:
+- Open the new accordion → confirm Pika tool was called with the Sourdough prompt and what it returned.
+- Cross-check with `server-function-logs` filtered by `pika`.
+
+If the tool was never called (the model just "talked about rendering"), #2 will make that obvious because no `pika_*` shimmer ever appears.
+
+## Technical notes
+
+- Wrapping MCP tools: `tools[\`pika_${name}\`] = { ...t, execute: async (args, ctx) => { const start = Date.now(); try { const out = await t.execute(args, ctx); console.log("[pika]", name, Date.now()-start+"ms", summarize(out)); return out; } catch (e) { console.error("[pika]", name, "threw", e); throw e; } } }`. Keep the original tool object's schema/description fields intact.
+- Output summarizer: reuse the URL-extraction logic from `extractVideoAssets` in `studio.tsx` so logs explicitly say `videos=[url1, ...]` or `videos=0`.
+- UI label mapping lives next to the existing `pendingTools[0] === "generate_image"` branch in `ChatPanel`.
+- No schema, auth, or routing changes.
+
+## Out of scope
+
+- Polling a Pika job-status endpoint (their MCP returns the URL inline; no separate poll needed).
+- Persisting tool-call history across reloads.
