@@ -897,6 +897,7 @@ function ChatPanel({
                 html={activeCard.html}
                 onAnswer={handleCardAnswer}
                 assets={assets}
+                projectId={projectId}
               />
             </div>
           )}

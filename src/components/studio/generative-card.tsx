@@ -1,6 +1,7 @@
 import DOMPurify from "isomorphic-dompurify";
 import { useEffect, useRef } from "react";
 import type { AssetKind, ProjectAsset } from "@/lib/project-state";
+import { uploadProjectAsset } from "@/lib/projects.functions";
 
 const SANITIZE_CONFIG = {
   ADD_ATTR: [
@@ -172,18 +173,46 @@ const nextAssetId = () => `ast_${Date.now().toString(36)}${(++_aid).toString(36)
 async function fileToAsset(
   file: File,
   source: HTMLElement,
+  projectId: string,
 ): Promise<LiveAsset> {
   const url = URL.createObjectURL(file);
   const meta = await probeMedia(url, file.type);
-  return {
-    id: nextAssetId(),
-    kind: inferKind(source, file),
-    mime: file.type || "application/octet-stream",
-    name: file.name,
-    url,
-    label: source.getAttribute("data-value") || undefined,
-    ...meta,
-  };
+  const kind = inferKind(source, file);
+  const label = source.getAttribute("data-value") || undefined;
+  // Upload to durable storage so external services (Pika, image gateways,
+  // etc.) can fetch a real https URL — `blob:` URLs only exist in this tab.
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+    const bytesB64 = btoa(bin);
+    const uploaded = await uploadProjectAsset({
+      data: {
+        projectId,
+        kind,
+        mime: file.type || "application/octet-stream",
+        name: file.name,
+        bytesB64,
+        label,
+        width: meta.width,
+        height: meta.height,
+        duration: meta.duration,
+      },
+    });
+    URL.revokeObjectURL(url);
+    return { ...uploaded, ...meta };
+  } catch (err) {
+    console.error("[generative-card] upload failed, falling back to blob URL", err);
+    return {
+      id: nextAssetId(),
+      kind,
+      mime: file.type || "application/octet-stream",
+      name: file.name,
+      url,
+      label,
+      ...meta,
+    };
+  }
 }
 
 function describeAsset(a: LiveAsset): string {
@@ -194,7 +223,11 @@ function describeAsset(a: LiveAsset): string {
       : a.duration
         ? ` ${a.duration}s`
         : "";
-  return `${kindLabel}: ${a.name}${dims} [${a.id}]`;
+  // Include the actual URL so the AI can pass it directly to downstream
+  // services (Pika, image generators) instead of inventing one from the id.
+  const urlPart =
+    a.url && /^https?:/.test(a.url) ? ` url=${a.url}` : "";
+  return `${kindLabel}: ${a.name}${dims} [${a.id}]${urlPart}`;
 }
 
 function fieldLabel(input: HTMLElement, name: string): string {
@@ -233,11 +266,13 @@ export function GenerativeCard({
   onAnswer,
   disabled,
   assets,
+  projectId,
 }: {
   html: string;
   onAnswer: (answer: CardAnswer) => void;
   disabled?: boolean;
   assets?: ProjectAsset[];
+  projectId: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const cleaned = stripProjectPatch(stripCardProse(stripCardWrapper(html)));
@@ -332,7 +367,7 @@ export function GenerativeCard({
       if (!list || list.length === 0) return;
       const assets: LiveAsset[] = [];
       for (const f of Array.from(list)) {
-        assets.push(await fileToAsset(f, input));
+        assets.push(await fileToAsset(f, input, projectId));
       }
       pendingFiles.set(input, assets);
       renderPreviewFor(input, assets);
@@ -375,7 +410,7 @@ export function GenerativeCard({
           const file = new File([blob], `capture-${Date.now()}.jpg`, {
             type: "image/jpeg",
           });
-          const asset = await fileToAsset(file, btn);
+          const asset = await fileToAsset(file, btn, projectId);
           onAnswer({ summary: describeAsset(asset), assets: [asset] });
         } else {
           // Audio capture — record until user clicks again.
@@ -388,7 +423,7 @@ export function GenerativeCard({
             const file = new File([blob], `voice-${Date.now()}.webm`, {
               type: "audio/webm",
             });
-            const asset = await fileToAsset(file, btn);
+            const asset = await fileToAsset(file, btn, projectId);
             asset.kind = "voice";
             onAnswer({ summary: describeAsset(asset), assets: [asset] });
           };
