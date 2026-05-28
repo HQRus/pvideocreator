@@ -679,6 +679,38 @@ export const Route = createFileRoute("/api/chat")({
                     },
                     { onConflict: "id" },
                   );
+                // Persist pika clip URLs durably so they don't 404 later.
+                try {
+                  const toolParts = (lastAssistant.parts as Array<{
+                    type: string;
+                    state?: string;
+                    output?: unknown;
+                  }>).filter(
+                    (p) =>
+                      typeof p.type === "string" &&
+                      p.type.startsWith("tool-pika_") &&
+                      p.state === "output-available",
+                  );
+                  for (const p of toolParts) {
+                    const urls = sweepVideoUrls(p.output);
+                    for (const u of urls) {
+                      try {
+                        await downloadAndStoreUrl({
+                          projectId,
+                          userId,
+                          sourceUrl: u,
+                          kind: "video",
+                          label: "Pika clip",
+                          fallbackMime: "video/mp4",
+                        });
+                      } catch (e) {
+                        console.error("[chat] pika clip persist failed:", e);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error("[chat] pika clip scan failed:", e);
+                }
                 // Apply embedded project patch (if any) to project_state.
                 const text = (lastAssistant.parts as Array<{ type: string; text?: string }>)
                   .filter((p) => p.type === "text")
