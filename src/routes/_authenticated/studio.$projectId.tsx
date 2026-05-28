@@ -12,7 +12,6 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
-import { startRender } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
