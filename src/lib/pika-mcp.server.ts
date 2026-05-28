@@ -85,6 +85,16 @@ function buildClientMetadata(redirectUri: string): OAuthClientMetadata {
 // In-memory captured redirect URL (used during connect-time flow).
 type Capture = { authUrl?: string };
 
+function generateOAuthState(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function makeProvider(
   userId: string,
   redirectUri: string,
@@ -124,6 +134,9 @@ function makeProvider(
     },
     async saveClientInformation(info) {
       await upsertRow(userId, { client_information: info });
+    },
+    async state() {
+      return generateOAuthState();
     },
     async saveState(state) {
       await upsertRow(userId, { oauth_state: state });
