@@ -258,7 +258,9 @@ function FloatingGallery({
   const listQuery = useQuery({
     queryKey: ["projects-list"],
     queryFn: () => fetchList(),
-    enabled: open,
+    // Always enabled so the collapsed circle strip stays in sync and the
+    // active project bubbles to the top whenever its state is patched.
+    refetchOnWindowFocus: true,
   });
   const onNew = async (e: React.MouseEvent) => {
     e.stopPropagation();
