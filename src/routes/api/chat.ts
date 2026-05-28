@@ -400,15 +400,10 @@ The Project panel must never sit empty after the user has given a concept.
   logline + scene.prompt + character description + a consistent style note.
   Then commit_project_patch to set each scene.thumb to the returned asset
   URL and scene.status = "ready".
-- When the user clicks "Go to production" (you'll see a directive starting
-  with "GO TO PRODUCTION"), call the available pika_* tools per scene —
-  prefer pika_generate_keyframes_video when scene.thumb exists, else
-  pika_generate_video. Pass scene.thumb as the keyframe/reference image,
-  scene.motionPrompt (or scene.prompt as fallback) as the motion direction,
-  and scene.duration. As each clip returns, commit_project_patch to set
-  scenes[i].clipUrl to the video URL and scenes[i].status = "ready".
-- If no pika_* tool is available, your handoff card must tell the user
-  Pika isn't connected yet and to reconnect from the home screen.
+- Video clip rendering is handled by the "Go to production" button in the
+  Project panel — that runs a deterministic server pipeline, not chat.
+  You may still call pika_* tools when the user asks in conversation for
+  a one-off scene render or revision.
 
 Rules for patches:
 - Use "scenes" / "cast" to REPLACE the full list. Use "scenesAppend" / "castAppend" to add to it.

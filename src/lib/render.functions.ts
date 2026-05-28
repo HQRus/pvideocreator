@@ -5,6 +5,7 @@
 // studio can subscribe via Supabase Realtime.
 
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -15,8 +16,14 @@ import {
 } from "@/lib/project-state";
 import {
   storeAsset,
-  // downloadAndStoreUrl, // reserved for clip step (v1.1)
+  downloadAndStoreUrl,
+  sweepCandidateVideoUrls,
 } from "@/lib/project-assets.server";
+import {
+  callbackUrlFromRequest,
+  getStatus as getPikaStatus,
+  openPikaMCPClient,
+} from "@/lib/pika-mcp.server";
 
 const KEYFRAME_MODEL = "google/gemini-2.5-flash-image";
 
@@ -313,4 +320,250 @@ export const retryRenderScene = createServerFn({ method: "POST" })
         .eq("id", out.id as string);
       throw new Error(msg);
     }
+  });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Production pipeline: per-scene Pika clip rendering (deterministic; no LLM).
+// ────────────────────────────────────────────────────────────────────────────
+
+type JsonSchema = {
+  properties?: Record<string, unknown>;
+  jsonSchema?: { properties?: Record<string, unknown> };
+};
+
+function schemaKeys(schema: unknown): Set<string> {
+  const s = (schema ?? {}) as JsonSchema;
+  const props = s.properties ?? s.jsonSchema?.properties ?? {};
+  return new Set(Object.keys(props));
+}
+
+function setFirst(
+  args: Record<string, unknown>,
+  keys: Set<string>,
+  candidates: string[],
+  value: unknown,
+): boolean {
+  if (value === undefined || value === null || value === "") return false;
+  for (const k of candidates) {
+    if (keys.has(k)) {
+      args[k] = value;
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildPikaArgs(
+  toolName: string,
+  schema: unknown,
+  scene: {
+    title: string;
+    prompt: string;
+    motionPrompt?: string;
+    duration: number;
+    thumb?: string;
+  },
+  aspect: string,
+): Record<string, unknown> {
+  const keys = schemaKeys(schema);
+  const args: Record<string, unknown> = {};
+  const motion = (scene.motionPrompt || scene.prompt || scene.title || "").trim();
+  const dur = Math.max(1, Math.round(scene.duration || 5));
+  const safeAspect = /:/.test(aspect) ? aspect : "16:9";
+  const image = scene.thumb && /^https?:\/\//.test(scene.thumb) ? scene.thumb : "";
+
+  setFirst(args, keys, ["promptText", "prompt", "text", "description"], motion);
+  setFirst(args, keys, ["duration", "durationSeconds", "duration_seconds", "length", "seconds"], dur);
+  setFirst(args, keys, ["aspectRatio", "aspect_ratio", "aspect"], safeAspect);
+
+  if (image) {
+    if (toolName === "generate_keyframes_video") {
+      if (!setFirst(args, keys, ["keyframes", "keyframeImages", "frames", "images"], [image])) {
+        setFirst(
+          args,
+          keys,
+          ["image", "imageUrl", "image_url", "firstFrame", "first_frame", "startImage"],
+          image,
+        );
+      }
+    } else {
+      setFirst(
+        args,
+        keys,
+        ["image", "imageUrl", "image_url", "startingFrame", "starting_frame", "startImage"],
+        image,
+      );
+    }
+  }
+  return args;
+}
+
+function extractTaskId(out: unknown): string | null {
+  const seen = new Set<unknown>();
+  let found: string | null = null;
+  const visit = (v: unknown) => {
+    if (found || !v || typeof v !== "object" || seen.has(v)) return;
+    seen.add(v);
+    if (Array.isArray(v)) {
+      for (const x of v) visit(x);
+      return;
+    }
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (found) return;
+      if (
+        typeof val === "string" &&
+        /^[a-zA-Z0-9_-]{6,}$/.test(val) &&
+        /^(task[_-]?id|taskId|id|jobId|job_id)$/i.test(k)
+      ) {
+        found = val;
+        return;
+      }
+      visit(val);
+    }
+  };
+  visit(out);
+  return found;
+}
+
+async function callPikaTool(
+  tools: Record<string, unknown>,
+  name: string,
+  args: unknown,
+): Promise<unknown> {
+  const t = tools[name] as { execute?: (a: unknown, c: unknown) => Promise<unknown> } | undefined;
+  if (!t?.execute) throw new Error(`Pika tool '${name}' not available`);
+  return await t.execute(args, {});
+}
+
+async function pollPikaTask(
+  tools: Record<string, unknown>,
+  taskId: string,
+  opts: { timeoutMs: number; intervalMs: number },
+): Promise<string[]> {
+  const status = tools["task_status"] as
+    | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
+    | undefined;
+  if (!status?.execute) return [];
+  const keys = schemaKeys(status.inputSchema);
+  const args: Record<string, unknown> = {};
+  setFirst(args, keys, ["taskId", "task_id", "id", "jobId", "job_id"], taskId);
+
+  const deadline = Date.now() + opts.timeoutMs;
+  let lastOut: unknown = null;
+  while (Date.now() < deadline) {
+    lastOut = await status.execute(args, {});
+    const urls = sweepCandidateVideoUrls(lastOut);
+    if (urls.length) return urls;
+    const txt = JSON.stringify(lastOut ?? {}).toLowerCase();
+    if (/("?status"?\s*:\s*"?(failed|error|cancell?ed))/i.test(txt)) {
+      throw new Error(`Pika task ${taskId} ended without a video URL`);
+    }
+    await new Promise((r) => setTimeout(r, opts.intervalMs));
+  }
+  throw new Error(`Pika task ${taskId} timed out`);
+}
+
+export const startProduction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { projectId: string }) =>
+    z.object({ projectId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const userId = context.userId;
+    const proj = await ownProject(data.projectId, userId);
+    const state = (proj.project_state ?? INITIAL_PROJECT) as ProjectState;
+    const pending = state.scenes.filter((s) => !s.clipUrl);
+    if (pending.length === 0) {
+      return { okCount: 0, failCount: 0, skipped: state.scenes.length };
+    }
+
+    if ((await getPikaStatus(userId)) !== "ready") {
+      return { error: "pika_not_connected" as const };
+    }
+
+    const request = getRequest();
+    const redirectUri = callbackUrlFromRequest(request);
+    const client = await openPikaMCPClient(userId, redirectUri);
+
+    let okCount = 0;
+    let failCount = 0;
+    try {
+      const tools = (await client.tools()) as Record<string, unknown>;
+      const aspect = state.meta.aspectRatio || "16:9";
+
+      for (const scene of pending) {
+        const toolName =
+          scene.thumb && tools["generate_keyframes_video"]
+            ? "generate_keyframes_video"
+            : "generate_video";
+        const toolEntry = tools[toolName] as { inputSchema?: unknown } | undefined;
+        if (!toolEntry) {
+          failCount++;
+          console.error(`[production] tool ${toolName} not available`);
+          continue;
+        }
+        try {
+          const args = buildPikaArgs(toolName, toolEntry.inputSchema, scene, aspect);
+          console.log(
+            `[production] -> ${toolName} scene=${scene.id} args=${JSON.stringify(args).slice(0, 400)}`,
+          );
+          let out = await callPikaTool(tools, toolName, args);
+          let urls = sweepCandidateVideoUrls(out);
+          if (urls.length === 0) {
+            const taskId = extractTaskId(out);
+            if (taskId) {
+              console.log(`[production] polling task ${taskId} for scene ${scene.id}`);
+              urls = await pollPikaTask(tools, taskId, {
+                timeoutMs: 10 * 60_000,
+                intervalMs: 5_000,
+              });
+            }
+          }
+          if (urls.length === 0) {
+            throw new Error("Pika returned no video URL");
+          }
+          const stored = await downloadAndStoreUrl({
+            projectId: data.projectId,
+            userId,
+            sourceUrl: urls[0],
+            kind: "video",
+            label: `Clip — ${scene.title}`,
+            fallbackMime: "video/mp4",
+          });
+
+          // Merge clipUrl into project_state.
+          const { data: cur } = await supabaseAdmin
+            .from("projects")
+            .select("project_state")
+            .eq("id", data.projectId)
+            .single();
+          const curState = (cur?.project_state as ProjectState) ?? state;
+          const nextScenes = curState.scenes.map((s) =>
+            s.id === scene.id
+              ? { ...s, clipUrl: stored.url, status: "ready" as const }
+              : s,
+          );
+          const nextState = applyPatch(curState, { scenes: nextScenes });
+          await supabaseAdmin
+            .from("projects")
+            .update({
+              project_state: nextState as unknown as never,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", data.projectId);
+          okCount++;
+          console.log(`[production] <- ${scene.id} ok ${stored.url}`);
+        } catch (err) {
+          failCount++;
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[production] scene ${scene.id} failed:`, msg);
+        }
+      }
+    } finally {
+      try {
+        await client.close();
+      } catch {}
+    }
+
+    return { okCount, failCount, skipped: state.scenes.length - pending.length };
   });

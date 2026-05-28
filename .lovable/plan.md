@@ -1,131 +1,89 @@
+
+# Problem
+
+Today the **Go to production** button assembles a long natural-language directive and posts it into the chat as a user message. The LLM then decides which `pika_*` MCP tool to call, in what order, with what arguments. Two bad consequences:
+
+1. The directive is visible in the transcript (you saw it).
+2. Rendering reliability depends on the model: it can skip scenes, pass wrong args, hit step limits, time out, or paraphrase the motion prompt.
+
+Pika MCP is a deterministic API. There's no reason a human-language prompt should sit between the button and the render.
+
 # Goal
-Turn the app into a real AI-directed video workflow where chat progressively gathers inputs, updates the project panel early, generates references/keyframes automatically or on demand, and uses the connected Pika MCP tools for production renders instead of stopping at placeholders.
 
-# What the app does today
-- **Chat is already the orchestration surface**: the studio chat sends messages to `/api/chat`, the model returns one interactive HTML card per turn, and hidden project patches update the project panel.
-- **Project panel updates are passive**: storyboard/scenes/cast/audio only appear if the model emits a patch; there is no stronger workflow layer guaranteeing that a concept turns into scenes automatically.
-- **Image generation exists**: chat can call `generate_image` and attach reference images to the project.
-- **Pika MCP is wired only inside chat turns**: `/api/chat` loads safe `pika_*` tools when the user is connected.
-- **Render is not “Go to production”**: the current `Render` button only calls `startRender`, which generates still keyframes for existing scenes via the image gateway. It does not create video clips or a final assembled result.
-- **Why you see blanks**: when scenes are missing, or their prompts are weak/unset, or no keyframe run has succeeded yet, the storyboard stays in placeholder state. There is also no automatic bridge from “we have a concept + likeness upload” to “generate first storyboard + first keyframes now.”
+Clicking **Go to production** runs a real server-side job:
+- iterate every scene missing `clipUrl`
+- call the right Pika MCP tool directly (no LLM)
+- stream per-scene status back to the panel
+- post one short assistant summary card in chat when done
 
-# Proposed product workflow
-## 1. Intake and concept shaping
-- User chats naturally.
-- AI always asks the next highest-value question with generated input UI.
-- As soon as there is enough signal, AI commits:
-  - project title
-  - logline
-  - aspect ratio
-  - target duration
-  - cast/likeness refs
-  - first-pass scene list
+The chat stays for creative direction only.
 
-## 2. Reference grounding
-- Uploaded likeness/reference assets become first-class project inputs.
-- AI can:
-  - attach a user selfie to the lead character
-  - generate additional visual refs from the concept
-  - request more refs only when needed
-- The cast/reference model should preserve **asset IDs + resolved URLs**, so likeness inputs are usable in prompts and visible in UI.
+# Plan
 
-## 3. Storyboard-first project creation
-- Once there is a concept, the app should automatically create a draft storyboard/scenes pass.
-- Each scene should include:
-  - title
-  - shot intent
-  - visual prompt
-  - motion prompt
-  - duration
-  - attached refs if relevant
-- The project panel should never remain empty after a solid concept turn.
+## 1. New server function: `startProduction`
+File: `src/lib/production.functions.ts` (new), helpers in `src/lib/production.server.ts` (new).
 
-## 4. Keyframe generation
-- Keyframes should be available in two ways:
-  - **automatic** after storyboard/scenes are created or materially changed
-  - **on demand** from chat or a project-panel action
-- Keyframe prompts should incorporate:
-  - project concept/logline
-  - scene description
-  - uploaded likeness/reference assets
-  - style continuity from prior approved frames
+- Auth-protected `createServerFn` that takes `{ projectId }`.
+- Loads project state, picks scenes where `!clipUrl`.
+- Opens one Pika MCP client via existing `openPikaMCPClient(userId, redirectUri)`.
+- For each scene, picks the tool deterministically:
+  - `pika_generate_keyframes_video` if `scene.thumb` resolves to an asset URL
+  - else `pika_generate_video`
+- Builds args from `motionPrompt || prompt`, `duration`, aspect ratio, keyframe URL.
+- Submits jobs in parallel (bounded concurrency, e.g. 3).
+- Persists job rows in a new `production_jobs` table (`project_id`, `scene_id`, `pika_task_id`, `status`, `clip_url`, `error`, timestamps).
+- Returns `{ jobs: [...] }` immediately — does not block on render.
 
-## 5. Production render
-- “Go to production” should mean:
-  1. validate that concept + scenes exist
-  2. ensure keyframes/refs exist or generate them first
-  3. submit scene video jobs through available `pika_*` tools
-  4. persist returned clip assets to project storage
-  5. show per-scene job status and finished video results in the panel
-- This must be **asynchronous job orchestration**, not a single blocking button call.
+## 2. Polling endpoint: `getProductionStatus`
+Same file. Takes `{ projectId }`, returns current job rows + which scenes now have `clipUrl`. Internally:
+- For any job still `processing`, calls the Pika status tool.
+- When complete, downloads the clip into project storage (reuse `project-assets.server.ts` durable-storage flow already used in `chat.ts`'s `onFinish`).
+- Patches `scenes[i].clipUrl` + `scenes[i].status = "ready"` in project state.
+- Marks job row `done` / `failed`.
 
-# Implementation plan
-## A. Make the workflow explicit in chat orchestration
-**Files:** `src/routes/api/chat.ts`, `src/lib/project-state.ts`
-- Strengthen the system prompt so the model must move from concept → refs → storyboard → production readiness instead of only asking isolated questions.
-- Expand project state to store what production actually needs, such as:
-  - motion prompt per scene
-  - reference asset links per scene/cast
-  - production readiness / approval state
-  - optional generated clip URL(s) per scene
-- Add stricter patch expectations so the first meaningful concept turn creates a usable storyboard draft.
+## 3. Replace the chat directive with a real button flow
+File: `src/routes/_authenticated/studio.$projectId.tsx` (~line 1188, 1391).
 
-## B. Fix project-state/UI mismatches that break continuity
-**Files:** `src/routes/_authenticated/studio.$projectId.tsx`, `src/lib/projects.functions.ts`
-- Fix cast/reference rendering so uploaded likeness assets resolve correctly in the Cast tab instead of relying on raw asset ids as image URLs.
-- Surface scene-level generated outputs more clearly in the storyboard/scenes UI:
-  - placeholder
-  - keyframe generating
-  - keyframe ready
-  - video rendering
-  - video ready / failed
+- Delete the directive string assembly and the `sendMessage` injection.
+- `Go to production` now calls `startProduction`, then starts a `useQuery` poll on `getProductionStatus` every ~5s until all jobs settle.
+- Show per-scene progress in the existing Storyboard/Scenes tiles (`status: "rendering" | "ready" | "failed"`).
+- When all jobs finish, append **one** short assistant message to the chat thread (server-stored, not a synthetic user turn) with the recap — e.g. "Rendered 4 / 5 scenes. Scene 3 failed: <reason>."
 
-## C. Separate “keyframes” from “production” as real pipeline stages
-**Files:** `src/lib/render.functions.ts`, `src/routes/_authenticated/studio.$projectId.tsx`
-- Keep the current still-image render path as **Generate keyframes**.
-- Rename/reframe the current action so it does not pretend to be final production.
-- Add panel controls for:
-  - generate all keyframes
-  - regenerate a scene keyframe
-  - go to production
+## 4. Remove the prompt-based path from chat
+File: `src/routes/api/chat.ts`.
 
-## D. Build a real production job pipeline using Pika MCP
-**Files:** likely `src/lib/render.functions.ts`, plus a new server helper such as `src/lib/production.functions.ts` or `src/lib/production.server.ts`
-- Create an async production server function that:
-  - reads project state
-  - derives per-scene production payloads
-  - uses connected `pika_*` MCP tools to submit video jobs
-  - tracks job ids/status/results per scene
-  - stores finished clip assets durably
-- Reuse existing persistence patterns from `project_assets`, `render_jobs`, and `render_scene_outputs` where possible rather than inventing a parallel system.
-- Make the UI poll or subscribe to job state so results appear without reload.
+- Drop the "Go to production" section (~line 403-410) from the system prompt.
+- Keep `pika_*` MCP tools available to the chat for ad-hoc one-off scene renders the user requests in conversation, but production = server job, not chat.
 
-## E. Auto-generate first storyboard/keyframes when the concept is strong enough
-**Files:** `src/routes/api/chat.ts`, `src/lib/render.functions.ts`, `src/routes/_authenticated/studio.$projectId.tsx`
-- Add a clear rule: once the project has a concept + at least one scene draft, the system should be able to auto-trigger first-pass keyframes.
-- Avoid surprise over-generation by gating this to meaningful milestones, e.g. after storyboard draft creation or explicit user approval.
+## 5. Pika disconnected case
+If the user has no Pika connection, `startProduction` returns `{ error: "pika_not_connected" }` and the button surfaces the existing "Connect Pika" UI inline. No chat message needed.
 
-## F. Make “Go to production” trustworthy
-**Files:** `src/routes/_authenticated/studio.$projectId.tsx`, production server functions
-- Replace the current one-line status text with real progress:
-  - validating project
-  - generating missing keyframes
-  - submitting scene renders
-  - waiting on scene outputs
-  - clips ready
-- Show visible output slots for generated videos so the user never sees “rendering” with no result area.
+## 6. Database
+New migration:
+```sql
+create table public.production_jobs (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null,
+  scene_id text not null,
+  pika_task_id text,
+  status text not null default 'queued', -- queued|processing|done|failed
+  clip_url text,
+  error text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+```
++ grants + RLS scoped to the project owner.
 
 # Technical notes
-- **Current render button behavior:** only generates still scene thumbnails through the image gateway; it does not produce final videos.
-- **Current Pika integration:** available only as chat-callable MCP tools; it is not yet wired into the dedicated Render button flow.
-- **Best architecture:** keep chat as the creative director, but move production execution into explicit server-side job orchestration so it can survive long-running render times and update the UI reliably.
-- **Storage/persistence:** continue using the existing backend tables and project asset storage; extend state shape instead of bolting on ad hoc local UI state.
 
-# Expected result after implementation
-A user can say “make a skate ad featuring me,” upload a selfie, and the app will:
-1. create a draft project and storyboard,
-2. attach the user likeness as a usable reference,
-3. generate coherent keyframes for scenes,
-4. let the user revise via chat or panel,
-5. send approved scenes to production through Pika MCP,
-6. show real per-scene progress and actual returned image/video assets in the project panel.
+- Pika clip downloads + storage already work in `chat.ts onFinish` — extract that into a shared helper in `production.server.ts` and call it from both places.
+- Concurrency cap avoids hammering Pika; jobs that fail individually don't fail the batch.
+- The chat thread no longer contains the directive at all — nothing to hide because nothing is sent.
+- Future: swap polling for Supabase Realtime on `production_jobs` if latency becomes an issue.
+
+# Out of scope
+
+- Reorganizing the Storyboard/Scenes UI beyond surfacing per-scene render state.
+- Changing how keyframes are generated (still chat-driven for now).
+- Migrating other chat directives — only "Go to production" moves to a server job in this change.

@@ -12,10 +12,9 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
-// startRender is intentionally not used anymore — the chat AI now drives
-// keyframe + production rendering through its tool calls (generate_image
-// for keyframes, pika_* for video). The "Generate keyframes" and "Go to
-// production" buttons send a directive into the chat.
+// "Generate keyframes" still routes through the chat AI (image gen tools).
+// "Go to production" runs the deterministic server pipeline below — no LLM.
+import { startProduction } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
@@ -1158,7 +1157,8 @@ function StructurePanel({
   onChatCommand?: (text: string) => void;
 }) {
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
-  void projectId; // reserved for future direct panel actions
+  const [rendering, setRendering] = useState(false);
+  const runProduction = useServerFn(startProduction);
   const missingKeyframes = scenes.filter((s) => !s.thumb).length;
   const missingClips = scenes.filter((s) => !s.clipUrl).length;
   const onGenerateKeyframes = () => {
@@ -1177,23 +1177,34 @@ function StructurePanel({
       `confirming how many keyframes were generated.`,
     );
   };
-  const onGoToProduction = () => {
+  const onGoToProduction = async () => {
     if (scenes.length === 0) {
       setRenderMsg("Draft at least one scene first.");
       return;
     }
-    setRenderMsg("Asked the director to render scenes via Pika.");
-    onChatCommand?.(
-      `GO TO PRODUCTION. Render every scene that doesn't already have a clipUrl into an actual video clip ` +
-      `using the available pika_* tools (prefer pika_generate_keyframes_video when a keyframe exists, ` +
-      `otherwise pika_generate_video). For each scene pass: the keyframe image (asset URL) as the starting ` +
-      `frame when supported, the scene's motionPrompt (or scene prompt as fallback) as the motion/camera ` +
-      `direction, and the scene duration. As each clip returns, emit a commit_project_patch updating ` +
-      `scenes[i].clipUrl and scenes[i].status. If no pika_* tools are available, tell the user the Pika ` +
-      `connection is missing. Final card: a short handoff listing which scenes rendered successfully.`,
-    );
+    if (missingClips === 0) {
+      setRenderMsg("Every scene already has a clip. Nothing to render.");
+      return;
+    }
+    setRendering(true);
+    setRenderMsg(`Rendering ${missingClips} scene${missingClips === 1 ? "" : "s"} via Pika…`);
+    try {
+      const res = await runProduction({ data: { projectId } });
+      if ("error" in res && res.error === "pika_not_connected") {
+        setRenderMsg("Pika isn't connected. Connect Pika from the header to render clips.");
+      } else if ("okCount" in res) {
+        const parts: string[] = [];
+        if (res.okCount) parts.push(`${res.okCount} rendered`);
+        if (res.failCount) parts.push(`${res.failCount} failed`);
+        setRenderMsg(parts.join(" · ") || "Nothing to render.");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setRenderMsg(`Render failed: ${msg}`);
+    } finally {
+      setRendering(false);
+    }
   };
-  const rendering = false;
   return (
     <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
