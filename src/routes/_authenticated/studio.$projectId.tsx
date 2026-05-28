@@ -58,7 +58,7 @@ import {
   type ProjectState,
   type Scene,
 } from "@/lib/project-state";
-export const Route = createFileRoute("/_authenticated/studio")({
+export const Route = createFileRoute("/_authenticated/studio/$projectId")({
   component: Studio,
 });
 
