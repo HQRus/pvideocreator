@@ -285,3 +285,80 @@ export const deleteMessage = createServerFn({ method: "POST" })
     await supabaseAdmin.from("project_messages").delete().eq("id", data.id);
     return { ok: true };
   });
+
+// ---------- upload user asset (selfies, logos, references, audio) ----------
+
+const ASSET_KINDS = [
+  "likeness",
+  "logo",
+  "reference",
+  "voice",
+  "audio",
+  "video",
+  "other",
+] as const satisfies readonly AssetKind[];
+
+export const uploadProjectAsset = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: {
+      projectId: string;
+      kind: AssetKind;
+      mime: string;
+      name: string;
+      bytesB64: string;
+      label?: string;
+      width?: number;
+      height?: number;
+      duration?: number;
+    }) =>
+      z
+        .object({
+          projectId: z.string().uuid(),
+          kind: z.enum(ASSET_KINDS),
+          mime: z.string().min(1).max(255),
+          name: z.string().min(1).max(255),
+          bytesB64: z.string().min(1).max(40_000_000), // ~30MB raw
+          label: z.string().max(255).optional(),
+          width: z.number().int().positive().optional(),
+          height: z.number().int().positive().optional(),
+          duration: z.number().positive().optional(),
+        })
+        .parse(data),
+  )
+  .handler(async ({ data, context }): Promise<ProjectAsset> => {
+    const userId = context.userId;
+    const { data: proj } = await supabaseAdmin
+      .from("projects")
+      .select("id")
+      .eq("id", data.projectId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!proj) throw new Error("Project not found");
+
+    const bin = atob(data.bytesB64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const stored = await storeAsset({
+      projectId: data.projectId,
+      userId,
+      kind: data.kind,
+      mime: data.mime,
+      bytes,
+      label: data.label,
+      name: data.name,
+    });
+
+    return {
+      id: stored.id,
+      kind: data.kind,
+      mime: data.mime,
+      name: data.name,
+      url: stored.url,
+      label: data.label,
+      width: data.width,
+      height: data.height,
+      duration: data.duration,
+    };
+  });
