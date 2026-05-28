@@ -1,105 +1,86 @@
-# AI Video Director — from "chat with diagnostic chips" to a real video factory
 
-## Goal
+# Make the studio real
 
-The app is a director's room. You chat with the AI using generative UI cards; while you talk, the AI shapes the Project (meta, scenes, cast, music, assets) in the side panel. When the spec is ready, **Render** kicks off a pipeline that generates keyframes → video clips (via Pika MCP / Seedance 2.0) → music → stitched final MP4, with every asset streaming back into the Project Panel as it lands. Projects are per-user and persisted.
-
-## Scope (v1)
-
-End-to-end render: keyframes → per-scene Pika clips → music track → one stitched MP4 per project. Per-user accounts. Each user connects their own Pika MCP. Past projects list and resume. The Pika activity chip moves behind a dev toggle.
+Turn the prototype pieces into working features, in 4 phases. Each phase is shippable on its own.
 
 ---
 
-## Phase 1 — Accounts & per-user Pika MCP
+## Phase 1 — Project & chat persistence
 
-Today: one shared Pika OAuth row (`pika_connections.id='singleton'`). Everyone's videos hit one Pika account.
+Goal: nothing is lost on reload. `ProjectState`, chat history, and uploaded/generated assets live in the DB and the storage bucket.
 
-Changes:
-1. **App auth**: email/password + Google sign-in (Lovable Cloud auth + Google via the Lovable broker). I'll treat app identity as separate from Pika identity — Pika OAuth doesn't expose stable claims suitable for app login, so using it as the *only* identity provider is fragile. Instead: standard sign-in, then each user links their own Pika.
-2. **Per-user Pika connection**: rewrite `pika_connections` to be keyed by `user_id` (one row per user, not a singleton). Update `pika-mcp.server.ts` so `loadRow`/`upsertRow`/OAuth provider and `openPikaMCPClient` all take a `userId` (resolved from `requireSupabaseAuth` context). OAuth callback writes to the calling user's row.
-3. **Studio gate**: `/studio` becomes `/_authenticated/studio`. Public landing stays at `/`. Login at `/login`.
-4. **Connect-Pika UX**: first time a signed-in user opens the studio without a Pika token, show a "Connect Pika to render" panel that runs the existing OAuth flow scoped to them.
+- Add server fns in `src/lib/projects.functions.ts`:
+  - `listProjects()` — returns id, title, status, updated_at, thumb url
+  - `getProject(id)` — returns project + messages + assets
+  - `createProject(title?)` — inserts a row, returns new id
+  - `updateProjectState(id, patch)` — merges a `ProjectPatch` server-side, writes `projects.project_state`
+  - `saveMessage(projectId, role, parts)` — appends to `project_messages`
+  - `deleteProject(id)`
+- Rework `/api/chat`:
+  - Require `projectId` in the request body
+  - Load prior messages from `project_messages` and prepend to the model context
+  - On stream finish, persist the assistant turn (full HTML card + tool parts) AND any project patch extracted from the card
+  - Persist the user turn before kicking off streaming
+- Asset durability: after `generate_image` and any `pika_*` tool result, the server downloads the bytes and uploads to the `project-assets/{user_id}/{project_id}/` bucket, then writes a `project_assets` row. Replace ephemeral gateway/Pika CDN URLs with our own signed URLs so clips don't expire.
+- Studio page reads via TanStack Query from `getProject($projectId)` and seeds `useChat` with the saved messages.
 
-## Phase 2 — Project persistence
+## Phase 2 — Projects list & routing
 
-Today: `ProjectState` lives only in React state; chat history is local; assets are blob URLs that die on reload.
+Goal: real multi-project UX.
 
-New tables (all RLS-scoped to `auth.uid()`):
-- `projects` — id, user_id, title, status, project_state jsonb (the `ProjectState` blob), created_at, updated_at
-- `project_messages` — id, project_id, role, parts jsonb (AI SDK UIMessage parts), created_at — replaces in-memory chat
-- `project_assets` — id, project_id, kind, mime, storage_path, url, width/height/duration, attached_to, created_at
-- `render_jobs` — id, project_id, status (`queued|running|stitching|done|failed`), error, started_at, finished_at
-- `render_scene_outputs` — id, render_job_id, scene_id, kind (`keyframe|clip|audio`), status, asset_id, prompt, model, error, started_at, finished_at — this is what the Project Panel subscribes to for live progress
-
-Storage: new private bucket `project-assets/{user_id}/{project_id}/...` for keyframes, clips, music, and the final stitched MP4. Generated assets get uploaded here (no more blob URLs).
-
-UI:
-- `/_authenticated/projects` — list of past projects with thumbnail + status
-- `/_authenticated/studio/$projectId` — current studio view, bound to a saved project
-- New chat message and `ProjectState` patch are persisted on every turn (server fn writes to `project_messages` + `projects.project_state`)
+- New routes:
+  - `/_authenticated/projects` — grid of past projects with thumb + status + updated_at, plus "New project" button (calls `createProject` then navigates)
+  - `/_authenticated/studio/$projectId` — current studio, bound to a saved project
+  - Old `/_authenticated/studio` redirects to `/projects` (or to the most recent project)
+- `FloatingGallery` (left rail) becomes real: lists projects from `listProjects`, "New project" works, current project is highlighted, clicking another navigates.
+- Post-login redirect lands on `/projects`.
 
 ## Phase 3 — Real render pipeline
 
-A new server function `startRender(projectId)` creates a `render_jobs` row and orchestrates the work. The orchestration runs on the server with progress streamed via Supabase Realtime on `render_scene_outputs` so the Project Panel updates live.
+Goal: clicking **Render** actually produces per-scene clips that stream into the Project Panel.
 
-For each scene, in order:
-1. **Keyframe** — generate one still image from the scene prompt (Lovable AI image model: `google/gemini-3.1-flash-image-preview` or `gemini-2.5-flash-image`). Upload to storage, write a `render_scene_outputs` row, link asset into the scene's `thumb`.
-2. **Clip** — call `pika_generate_2_2` (or Seedance equivalent) with the scene prompt + the keyframe as starting frame + aspect ratio + duration. Poll/await the resulting video URL. Download → upload to our bucket → write `render_scene_outputs`.
-3. After all scenes: **music** — generate one track sized to total duration (see "music" note below).
-4. **Stitch** — combine clips + music into one MP4 (see "stitching" note below). Save as the project's final asset. Mark job `done`.
+- New server fn `startRender(projectId)`:
+  1. Inserts a `render_jobs` row (`status='queued'`), one `render_scene_outputs` row per scene per kind (`keyframe`, `clip`)
+  2. Marks job `running`, then for each scene sequentially:
+     - Generate a keyframe via Lovable AI image gen (`google/gemini-3.1-flash-image-preview`), upload to bucket, write asset, update scene output → `done`, patch `scene.thumb`
+     - Call `pika_generate_2_2` via the user's Pika MCP with the scene prompt + keyframe + scene duration + project aspect ratio, await the result, download the MP4, upload to bucket, write asset, update scene output → `done`
+     - On error: mark only that row `failed` with the message, continue
+  3. Mark job `done` (or `failed` if everything failed)
+- New server fn `retryRenderScene(sceneOutputId)` — reruns just one step.
+- Wire the Render button: calls `startRender`, then subscribes via Supabase Realtime to `render_scene_outputs` and `render_jobs` filtered by `render_job_id`. Project Panel scene cards fill in thumbnails → clip previews live. Top-bar status pill flips to `Rendering` while the job runs.
+- Move the diagnostic `PikaCallChip` behind `localStorage.getItem('avd:dev') === '1'`.
+- Better Pika URL extraction (don't require a `.mp4` extension — accept any URL Pika returns as the result video).
 
-Failures on a single scene mark only that `render_scene_outputs` row as `failed` with an error message; the rest of the job continues. The Project Panel surfaces per-scene errors with a Retry button that re-runs just that step.
+## Phase 4 — Stitch + audio (v1 cut)
 
-The diagnostic chip moves into a `localStorage`-gated "Dev" panel; the real progress UI is the Project Panel's scene cards filling in thumbnails → clip previews as the job runs.
+Goal: one final downloadable MP4 per project.
 
----
-
-## Two architectural calls I need from you
-
-### A. Stitching — Workers has no ffmpeg
-
-The TanStack server runs on Cloudflare Workers. No ffmpeg, no spawn, no native binaries. Options:
-
-1. **Browser-side stitch via `ffmpeg.wasm`** — when the render job hits `stitching`, the client downloads clips + music, runs ffmpeg in a Worker thread, uploads the result. Pros: zero new infra, works today. Cons: requires the user's tab open at stitch time, slow on long videos, eats their RAM.
-2. **External render service** — call out to a hosted ffmpeg/render API (Shotstack, Creatomate, Mux, or a tiny Modal/Replicate function we wire up). Pros: robust, runs without the tab. Cons: new dependency + key + cost.
-3. **Skip stitching in v1** — Project Panel shows the ordered list of per-scene clips and the music track; user downloads or previews them stitched in-browser only. Ship the rest first.
-
-My recommendation: **(1) `ffmpeg.wasm` for v1**, keep door open to (2) later. Cheapest path to a real stitched MP4 without adding billing surface.
-
-### B. Music
-
-Pika MCP doesn't generate music. Options:
-1. **ElevenLabs Music** (via the existing ElevenLabs connector) — best fit, real generative music.
-2. **User-uploaded track** — skip generation, let the user attach an mp3; AI picks beats/duration.
-3. **Defer music to v1.1** — render produces a silent stitched MP4 for now.
-
-My recommendation: **(2) upload for v1, (1) ElevenLabs as soon as we wire that connector**. Keeps v1 shippable.
+- **Stitching**: browser-side via `ffmpeg.wasm`. When `render_jobs.status` flips to `stitching`, the open tab downloads every scene clip + the audio track, concatenates with ffmpeg.wasm, uploads the result to `project-assets/.../final.mp4`, writes the asset, and sets `render_jobs.final_asset_id` + `status='done'`. Disclose in UI that the tab must stay open during stitch.
+- **Audio (v1)**: user-uploaded mp3 only. Add an "Upload track" affordance to the Audio tab of the Project Panel; the file lands in `project-assets` and gets stitched in. (ElevenLabs Music deferred to v1.1.)
+- **Share** and **Export** buttons: Export = download the final MP4 from storage; Share = copy a signed URL to clipboard. Both disabled until `render_jobs.status === 'done'` with a `final_asset_id`.
 
 ---
 
 ## Technical notes
 
-- **`pika_connections` migration**: add `user_id uuid not null references auth.users on delete cascade`, drop the `id='singleton'` default, add unique index on `user_id`, RLS so each user only sees their row. `service_role` keeps full access for the OAuth callback. All call sites in `pika-mcp.server.ts` take `userId` explicitly.
-- **Server fns added** (`createServerFn` + `requireSupabaseAuth`): `listProjects`, `getProject`, `createProject`, `updateProjectState`, `saveMessage`, `getMessages`, `startRender`, `getRenderJob`, `retryRenderScene`, `getPikaStatus`, `beginPikaConnect`.
-- **Realtime**: enable Postgres changes on `render_scene_outputs` and `render_jobs`; client subscribes filtered by current `render_job_id`.
-- **Chat handler** (`/api/chat`): now requires auth, loads project + messages by `projectId` from the request, persists assistant turns + project patches on stream finish. Pika MCP client is opened per-request with the calling user's tokens.
-- **`extractCardTitle` / `extractCardProse` "Card" fallback**: leave as fixed in last turn.
-- **Diagnostic chip**: gate `<PikaCallChip>` rendering behind `localStorage.getItem('avd:dev') === '1'`. Same instrumentation logs stay server-side for debugging.
+- DB tables already exist (`projects`, `project_messages`, `project_assets`, `render_jobs`, `render_scene_outputs`) and the `project-assets` bucket exists. RLS is already user-scoped. No new tables needed; only need to enable Realtime on `render_jobs` and `render_scene_outputs`.
+- All new server fns use `requireSupabaseAuth`. The Pika MCP client is opened per-request with the calling user's tokens via the existing `openPikaMCPClient(userId, redirectUri)`.
+- Server-side `applyPatch` reuses `src/lib/project-state.ts`.
+- The render orchestration runs inside `startRender`'s handler (one Worker invocation per scene step is fine for v1; if Pika polling pushes us past Worker time limits, switch to a "kick + Realtime resumes from DB state" model).
+- `useChat` is keyed by `projectId` so switching projects remounts the chat with the right history.
 
-## Out of scope (call out, do later)
+## Out of scope (v1)
 
-- Branching / version history of a project
-- Multi-user collaboration on one project
-- Per-scene re-prompting via chat after render (only Retry exists in v1)
-- ElevenLabs music generation (queued for v1.1)
-- Replacing ffmpeg.wasm with a hosted render service
-- Mobile-optimized studio layout
+- ElevenLabs music generation
+- Hosted ffmpeg / render service (stays browser-side)
+- Per-scene re-prompting via chat after render
+- Collaboration / sharing across users
+- Mobile studio layout
 
 ## Acceptance
 
-1. New user signs up, lands on `/projects`, sees empty state, creates a project, ends up in `/studio/$id`.
-2. They connect Pika (their own OAuth, not a shared one).
-3. They chat through a 3–5 scene short. Project Panel fills with scenes, cast, references as they talk. Reloading the page restores everything.
-4. They click Render. Within seconds the first scene's keyframe appears in its card; then its clip; then the next scene; then music; then a final stitched MP4 download/preview.
-5. If a Pika call fails on scene 3, scenes 1, 2, 4, 5 still complete; scene 3 shows an error + Retry; clicking Retry re-runs only that scene and the stitch.
-6. The "Pika activity chip" no longer appears for normal users.
+1. Sign up → land on `/projects` empty state → create a project → `/studio/$id`.
+2. Chat a 3–5 scene short. Reload → everything restored (chat, project state, uploaded refs).
+3. Click Render. Scene 1 keyframe appears in seconds, then its clip, then scene 2, etc. A failed Pika call shows an error + Retry on just that scene.
+4. After all scenes finish, upload an mp3, wait for stitch, then Export downloads the final MP4.
+5. Pika activity chip no longer visible unless `localStorage.avd:dev='1'`.
