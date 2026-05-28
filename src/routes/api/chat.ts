@@ -507,7 +507,33 @@ export const Route = createFileRoute("/api/chat")({
             pikaClient = await openPikaMCPClient(redirectUri);
             const pikaTools = await pikaClient.tools();
             for (const [name, t] of Object.entries(pikaTools)) {
-              tools[`pika_${name}`] = t;
+              const key = `pika_${name}`;
+              const original = t as { execute?: (args: unknown, ctx: unknown) => Promise<unknown> };
+              const origExec = original.execute?.bind(original);
+              tools[key] = origExec
+                ? {
+                    ...(t as object),
+                    execute: async (args: unknown, ctx: unknown) => {
+                      const start = Date.now();
+                      const argSummary = JSON.stringify(args).slice(0, 400);
+                      console.log(`[pika] -> ${key} args=${argSummary}`);
+                      try {
+                        const out = await origExec(args, ctx);
+                        const urls = sweepVideoUrls(out);
+                        const ms = Date.now() - start;
+                        const outSummary = JSON.stringify(out).slice(0, 500);
+                        console.log(
+                          `[pika] <- ${key} ${ms}ms videos=${urls.length}${urls.length ? " " + urls.join(",") : ""} out=${outSummary}`,
+                        );
+                        return out;
+                      } catch (err) {
+                        const ms = Date.now() - start;
+                        console.error(`[pika] !! ${key} ${ms}ms threw`, err);
+                        throw err;
+                      }
+                    },
+                  }
+                : t;
             }
           }
         } catch (err) {
