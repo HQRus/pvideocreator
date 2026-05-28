@@ -616,11 +616,13 @@ function ChatPanel({
   initialMessages,
   onPatch,
   assets,
+  registerSender,
 }: {
   projectId: string;
   initialMessages: UIMessage[];
   onPatch: (patch: ProjectPatch) => void;
   assets: ProjectAsset[];
+  registerSender?: (fn: (text: string) => void) => void;
 }) {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat({
@@ -645,6 +647,15 @@ function ChatPanel({
     setInput("");
     await sendMessage({ text: trimmed });
   };
+
+  // Expose our sender to the parent so the right-hand panel buttons can
+  // dispatch directives into the chat (keyframes / production).
+  useEffect(() => {
+    registerSender?.((text: string) => {
+      void handleSend(text);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSender, busy]);
 
   // Card answers can also carry uploaded assets. Patch them into project
   // state immediately so the panel reflects the upload, then send a
