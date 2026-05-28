@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Maximize2,
   FolderOpen,
+  Loader2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -1019,6 +1020,7 @@ function SceneTile({
   active: boolean;
   onClick: () => void;
 }) {
+  const isRendering = scene.status === "rendering";
   return (
     <button
       onClick={onClick}
@@ -1028,7 +1030,7 @@ function SceneTile({
           : "border-border hover:border-primary/40"
       }`}
     >
-      <div className="aspect-[9/16] overflow-hidden bg-muted">
+      <div className="relative aspect-[9/16] overflow-hidden bg-muted">
         {scene.thumb ? (
           <img
             src={scene.thumb}
@@ -1040,12 +1042,17 @@ function SceneTile({
             <Film className="h-6 w-6" />
           </div>
         )}
+        {isRendering && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-sm">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent" />
-      <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-[10px] backdrop-blur">
-        #{scene.n}
-      </div>
-      <div className="absolute right-2 top-2">
+      <div className="absolute inset-x-2 top-2 flex items-start justify-between">
+        <span className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-[10px] leading-none backdrop-blur">
+          #{scene.n}
+        </span>
         <StatusDot status={scene.status} />
       </div>
       <div className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-brand-gradient opacity-0 shadow-glow transition group-hover:opacity-100">
@@ -1071,8 +1078,8 @@ function StatusDot({ status }: { status: Scene["status"] }) {
         : "bg-muted-foreground/60";
   const label = status === "ready" ? "Ready" : status === "rendering" ? "Rendering" : "Draft";
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] backdrop-blur">
-      <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
+    <span className="inline-flex items-start gap-1 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] leading-none backdrop-blur">
+      <span className={`mt-[3px] h-1.5 w-1.5 rounded-full ${color}`} />
       {label}
     </span>
   );
