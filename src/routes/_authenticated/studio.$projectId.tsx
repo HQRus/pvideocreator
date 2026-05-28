@@ -724,7 +724,9 @@ function ChatPanel({
             <BrandMark className="h-12 w-12" />
             <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
           </div>
-          {pikaCalls.length > 0 && (
+          {pikaCalls.length > 0 &&
+            typeof window !== "undefined" &&
+            window.localStorage?.getItem("avd:dev") === "1" && (
             <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card/50 p-3">
               <div className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Pika render activity
