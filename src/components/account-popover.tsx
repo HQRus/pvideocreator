@@ -126,7 +126,7 @@ export function AccountPopover() {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-3 rounded-2xl border border-border bg-card/95 px-3 py-2 pr-2 shadow-lg backdrop-blur transition hover:bg-card"
+            className="flex items-center gap-3 rounded-3xl bg-card px-3 py-2 pr-2 shadow-elegant backdrop-blur-xl transition hover:bg-card/80"
           >
             <Avatar className="h-9 w-9">
               {user.avatar ? <AvatarImage src={user.avatar} alt="" /> : null}
