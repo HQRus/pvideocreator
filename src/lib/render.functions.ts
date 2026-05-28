@@ -5,6 +5,7 @@
 // studio can subscribe via Supabase Realtime.
 
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -15,8 +16,14 @@ import {
 } from "@/lib/project-state";
 import {
   storeAsset,
-  // downloadAndStoreUrl, // reserved for clip step (v1.1)
+  downloadAndStoreUrl,
+  sweepCandidateVideoUrls,
 } from "@/lib/project-assets.server";
+import {
+  callbackUrlFromRequest,
+  getStatus as getPikaStatus,
+  openPikaMCPClient,
+} from "@/lib/pika-mcp.server";
 
 const KEYFRAME_MODEL = "google/gemini-2.5-flash-image";
 
