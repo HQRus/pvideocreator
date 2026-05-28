@@ -12,6 +12,10 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
+// startRender is intentionally not used anymore — the chat AI now drives
+// keyframe + production rendering through its tool calls (generate_image
+// for keyframes, pika_* for video). The "Generate keyframes" and "Go to
+// production" buttons send a directive into the chat.
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
@@ -175,6 +179,11 @@ function Studio() {
     });
   };
 
+  // The Render / Production buttons live in the right-hand StructurePanel
+  // but need to dispatch into the chat (which owns the AI SDK session).
+  // We expose a ref the ChatPanel registers its sender into.
+  const chatSendRef = useRef<((text: string) => void) | null>(null);
+
   const setScenes = (next: Scene[]) =>
     setProject((prev) => ({ ...prev, scenes: next }));
 
@@ -215,6 +224,9 @@ function Studio() {
             initialMessages={initialMessages}
             onPatch={handlePatch}
             assets={assets}
+            registerSender={(fn) => {
+              chatSendRef.current = fn;
+            }}
           />
         </div>
       </div>
@@ -238,6 +250,7 @@ function Studio() {
             activeSceneId={activeSceneId}
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
+            onChatCommand={(text) => chatSendRef.current?.(text)}
           />
         </div>
       </aside>
