@@ -325,7 +325,7 @@ function FloatingGallery({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible px-3 py-2 pb-4">
         {open ? (
           <div className="flex flex-col gap-2">
             {projects.length === 0 && listQuery.isLoading && (
@@ -423,7 +423,7 @@ function ProjectAvatar({
 }) {
   const initial = (title || "?").trim().charAt(0).toUpperCase() || "?";
   const ring = isCurrent
-    ? "ring-2 ring-primary ring-offset-2 ring-offset-card opacity-100"
+    ? "ring-2 ring-primary opacity-100"
     : "ring-1 ring-border opacity-50 grayscale";
   return (
     <div
