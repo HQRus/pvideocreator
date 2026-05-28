@@ -275,8 +275,10 @@ function FloatingGallery({
     format: string;
     aspectRatio: string;
     sceneCount: number;
+    thumbnailUrl: string | null;
   };
   const projects: ProjectRow[] = (listQuery.data?.projects ?? []) as ProjectRow[];
+  const collapsedPreview = projects.slice(0, 6);
   return (
     <aside
       onClick={() => {
