@@ -4,6 +4,8 @@ import { ArrowRight } from "lucide-react";
 import symbolLogo from "@/assets/symbol.svg";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { useServerFn } from "@tanstack/react-start";
+import { createProject } from "@/lib/projects.functions";
 
 export const Route = createFileRoute("/")({
   component: ConnectGate,
@@ -29,10 +31,20 @@ type Status = "loading" | "disconnected" | "connecting" | "ready" | "error";
 
 function ConnectGate() {
   const navigate = useNavigate();
+  const createNew = useServerFn(createProject);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const goToNewProject = async () => {
+    try {
+      const { id } = await createNew({ data: {} });
+      void navigate({ to: "/studio/$projectId", params: { projectId: id } });
+    } catch {
+      void navigate({ to: "/projects" });
+    }
+  };
 
   const refresh = async () => {
     try {
@@ -40,7 +52,7 @@ function ConnectGate() {
       const j = (await r.json()) as { state?: string };
       if (j.state === "ready") {
         setStatus("ready");
-        void navigate({ to: "/projects" });
+        void goToNewProject();
       } else {
         setStatus("disconnected");
       }
