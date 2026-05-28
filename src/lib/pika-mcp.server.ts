@@ -85,6 +85,21 @@ function buildClientMetadata(redirectUri: string): OAuthClientMetadata {
 // In-memory captured redirect URL (used during connect-time flow).
 type Capture = { authUrl?: string };
 
+function getRegisteredRedirects(
+  clientInformation: OAuthClientInformation | null | undefined,
+): string[] {
+  const redirects = (clientInformation as { redirect_uris?: unknown } | null | undefined)
+    ?.redirect_uris;
+  return Array.isArray(redirects)
+    ? redirects.filter((value): value is string => typeof value === "string" && value.length > 0)
+    : [];
+}
+
+async function resolveRedirectUri(userId: string, fallback: string): Promise<string> {
+  const row = await loadRow(userId);
+  return getRegisteredRedirects(row?.client_information)[0] ?? fallback;
+}
+
 function generateOAuthState(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
@@ -209,12 +224,7 @@ export async function beginConnect(
   { state: "ready" } | { state: "authenticating"; authUrl: string; oauthState?: string }
 > {
   const existing = await loadRow(userId);
-  const registeredRedirects = Array.isArray(
-    (existing?.client_information as { redirect_uris?: unknown } | null)?.redirect_uris,
-  )
-    ? (((existing?.client_information as { redirect_uris?: string[] | undefined } | null)
-        ?.redirect_uris ?? []) as string[])
-    : [];
+  const registeredRedirects = getRegisteredRedirects(existing?.client_information);
   const shouldResetClientInformation =
     registeredRedirects.length > 0 && !registeredRedirects.includes(redirectUri);
 
@@ -254,7 +264,8 @@ export async function completeOAuth(
   redirectUri: string,
 ): Promise<void> {
   const capture: Capture = {};
-  const provider = makeProvider(userId, redirectUri, capture);
+  const exactRedirectUri = await resolveRedirectUri(userId, redirectUri);
+  const provider = makeProvider(userId, exactRedirectUri, capture);
   const result = await mcpAuth(provider, {
     serverUrl: PIKA_MCP_URL,
     authorizationCode: code,
@@ -296,7 +307,8 @@ export async function findUserIdByOAuthState(state: string): Promise<string | nu
  */
 export async function openPikaMCPClient(userId: string, redirectUri: string) {
   const capture: Capture = {};
-  const provider = makeProvider(userId, redirectUri, capture);
+  const exactRedirectUri = await resolveRedirectUri(userId, redirectUri);
+  const provider = makeProvider(userId, exactRedirectUri, capture);
   return createMCPClient({
     transport: {
       type: "http",
