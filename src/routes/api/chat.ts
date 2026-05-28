@@ -655,7 +655,8 @@ export const Route = createFileRoute("/api/chat")({
               try { await pikaClient.close(); } catch {}
             }
           },
-          onError: async () => {
+          onError: async ({ error }) => {
+            console.error("[chat] streamText error:", error);
             if (pikaClient) {
               try { await pikaClient.close(); } catch {}
             }
@@ -664,6 +665,17 @@ export const Route = createFileRoute("/api/chat")({
 
         return result.toUIMessageStreamResponse({
           originalMessages: messages as UIMessage[],
+          onError: (error) => {
+            console.error("[chat] toUIMessageStreamResponse error:", error);
+            if (error == null) return "Unknown error";
+            if (typeof error === "string") return error;
+            if (error instanceof Error) return error.message;
+            try {
+              return JSON.stringify(error);
+            } catch {
+              return String(error);
+            }
+          },
           onFinish: async ({ messages: all }) => {
             const lastAssistant = all[all.length - 1];
             if (lastAssistant?.role === "assistant" && lastAssistant.id) {
