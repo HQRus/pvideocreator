@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Maximize2,
   FolderOpen,
+  Loader2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
