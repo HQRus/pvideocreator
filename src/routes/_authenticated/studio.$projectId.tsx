@@ -166,11 +166,16 @@ function Studio() {
           onTogglePanel={() => setPanelOpen((o) => !o)}
         />
         <div className="min-h-0 flex-1">
-          <ChatPanel onPatch={handlePatch} assets={assets} />
+          <ChatPanel
+            projectId={projectId}
+            initialMessages={initialMessages}
+            onPatch={handlePatch}
+            assets={assets}
+          />
         </div>
       </div>
 
-      <FloatingGallery projectTitle={meta.title} />
+      <FloatingGallery currentProjectId={projectId} currentTitle={meta.title} />
 
       <aside
         className={`pointer-events-auto absolute right-4 top-4 bottom-4 z-30 overflow-hidden rounded-3xl bg-card shadow-elegant transition-[width,opacity] duration-300 ease-out ${
