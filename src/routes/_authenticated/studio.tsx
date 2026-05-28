@@ -392,7 +392,10 @@ function ChatPanel({
 }) {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      headers: () => buildAuthHeaders(),
+    }),
   });
 
   const busy = status === "submitted" || status === "streaming";

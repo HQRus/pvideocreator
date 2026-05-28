@@ -1,7 +1,9 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import symbolLogo from "@/assets/symbol.svg";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchWithAuth } from "@/lib/fetch-with-auth";
 
 export const Route = createFileRoute("/")({
   component: ConnectGate,
@@ -27,17 +29,18 @@ type Status = "loading" | "disconnected" | "connecting" | "ready" | "error";
 
 function ConnectGate() {
   const navigate = useNavigate();
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = async () => {
     try {
-      const r = await fetch("/api/pika/status");
+      const r = await fetchWithAuth("/api/pika/status");
       const j = (await r.json()) as { state?: string };
       if (j.state === "ready") {
         setStatus("ready");
-        void navigate({ to: "/studio" });
+        void navigate({ to: "/_authenticated/studio" });
       } else {
         setStatus("disconnected");
       }
@@ -48,7 +51,15 @@ function ConnectGate() {
   };
 
   useEffect(() => {
-    void refresh();
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data?.user) {
+        setAuthed(false);
+        return;
+      }
+      setAuthed(true);
+      void refresh();
+    })();
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
@@ -58,11 +69,11 @@ function ConnectGate() {
     setStatus("connecting");
     setError(null);
     try {
-      const r = await fetch("/api/pika/connect", { method: "POST" });
+      const r = await fetchWithAuth("/api/pika/connect", { method: "POST" });
       const j = (await r.json()) as { state?: string; authUrl?: string };
       if (j.state === "ready") {
         setStatus("ready");
-        void navigate({ to: "/studio" });
+        void navigate({ to: "/_authenticated/studio" });
         return;
       }
       if (j.authUrl) {
@@ -70,7 +81,7 @@ function ConnectGate() {
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = setInterval(async () => {
           try {
-            const s = await fetch("/api/pika/status").then(
+            const s = await fetchWithAuth("/api/pika/status").then(
               (r) => r.json() as Promise<{ state?: string }>,
             );
             if (s.state === "ready") {
@@ -79,7 +90,7 @@ function ConnectGate() {
                 pollRef.current = null;
               }
               setStatus("ready");
-              void navigate({ to: "/studio" });
+              void navigate({ to: "/_authenticated/studio" });
             }
           } catch {
             /* keep polling */
@@ -105,6 +116,28 @@ function ConnectGate() {
           : "Connect Pika MCP";
 
   const disabled = status === "loading" || status === "connecting" || status === "ready";
+
+  if (authed === false) {
+    return (
+      <main className="relative grid min-h-screen w-full place-items-center bg-background px-6 text-center text-foreground">
+        <div className="max-w-xl">
+          <img src={symbolLogo} alt="" className="mx-auto mb-8 h-[26px] w-auto brightness-0" />
+          <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+            AI Video Director
+          </h1>
+          <p className="mt-5 text-base text-muted-foreground">
+            Chat with an AI director that turns your idea into a real video — keyframes, clips, music, stitched MP4.
+          </p>
+          <Link
+            to="/login"
+            className="mt-8 inline-flex items-center gap-3 rounded-full bg-foreground px-7 py-4 text-base font-semibold text-background shadow-elegant hover:shadow-glow"
+          >
+            Sign in to start <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
