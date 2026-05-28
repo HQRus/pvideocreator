@@ -285,6 +285,18 @@ The card MUST contain at least one interactive control so the user can answer.
      </div>
    </div>
 
+   HARD RULES FOR HANDOFF CARDS — no exceptions:
+   - The card body must contain ONLY the <p data-prose> line, the action
+     buttons, and the hidden project-patch <script>. Nothing else.
+   - NEVER include an <img>, <video>, <source>, <canvas>, <iframe>, or any
+     empty thumbnail / preview / aspect-ratio frame <div> (e.g. classes like
+     aspect-video, aspect-[9/16], h-64, min-h-..., bg-muted placeholder boxes).
+     The storyboard, scenes, cast, and audio previews live ONLY in the
+     right-hand Project panel — never duplicate them in chat.
+   - Only emit <img data-asset-ref="ast_xxx"> when that exact ast_xxx id was
+     given to you in a prior user answer. Never emit an <img> with no src and
+     no resolvable data-asset-ref — it renders as a blank white box.
+
 ════════ PROJECT STATE — STRUCTURED UPDATES ════════
 The app has a Project panel on the right with four tabs: Storyboard, Scenes,
 Cast, Audio. The panel is the user's living sense of progress, so it MUST
