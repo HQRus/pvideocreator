@@ -21,6 +21,27 @@ let _toolAssetCounter = 0;
 const nextToolAssetId = () =>
   `ast_t${Date.now().toString(36)}${(++_toolAssetCounter).toString(36)}`;
 
+// Walk an arbitrary value for video-ish URLs (used to summarize Pika output in logs).
+function sweepVideoUrls(out: unknown): string[] {
+  const urls = new Set<string>();
+  const visit = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const matches = v.match(/https?:\/\/[^\s"'<>)]+/g);
+      if (matches) for (const u of matches) {
+        if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) urls.add(u);
+      }
+      return;
+    }
+    if (Array.isArray(v)) { v.forEach(visit); return; }
+    if (typeof v === "object") {
+      for (const val of Object.values(v as Record<string, unknown>)) visit(val);
+    }
+  };
+  visit(out);
+  return Array.from(urls);
+}
+
 async function gatewayGenerateImage(
   prompt: string,
   apiKey: string,
