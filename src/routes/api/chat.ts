@@ -725,7 +725,7 @@ export const Route = createFileRoute("/api/chat")({
           },
         });
 
-        return result.toUIMessageStreamResponse({
+        const response = result.toUIMessageStreamResponse({
           originalMessages: messages as UIMessage[],
           onError: (error) => {
             console.error("[chat] toUIMessageStreamResponse error:", error);
@@ -753,11 +753,16 @@ export const Route = createFileRoute("/api/chat")({
                     },
                     { onConflict: "id" },
                   );
-                // Persist pika clip URLs durably so they don't 404 later.
+                // Persist pika clip URLs durably AND assign each to a scene.
+                const sceneAssignments: Array<{
+                  durableUrl: string;
+                  inputStr: string;
+                }> = [];
                 try {
                   const toolParts = (lastAssistant.parts as Array<{
                     type: string;
                     state?: string;
+                    input?: unknown;
                     output?: unknown;
                   }>).filter(
                     (p) =>
@@ -767,9 +772,13 @@ export const Route = createFileRoute("/api/chat")({
                   );
                   for (const p of toolParts) {
                     const urls = sweepVideoUrls(p.output);
+                    let inputStr = "";
+                    try {
+                      inputStr = JSON.stringify(p.input ?? {});
+                    } catch {}
                     for (const u of urls) {
                       try {
-                        await downloadAndStoreUrl({
+                        const stored = await downloadAndStoreUrl({
                           projectId,
                           userId,
                           sourceUrl: u,
@@ -777,8 +786,17 @@ export const Route = createFileRoute("/api/chat")({
                           label: "Pika clip",
                           fallbackMime: "video/mp4",
                         });
+                        sceneAssignments.push({
+                          durableUrl: stored.url,
+                          inputStr,
+                        });
                       } catch (e) {
                         console.error("[chat] pika clip persist failed:", e);
+                        // Fall back to source URL so the user still sees something.
+                        sceneAssignments.push({
+                          durableUrl: u,
+                          inputStr,
+                        });
                       }
                     }
                   }
@@ -791,17 +809,54 @@ export const Route = createFileRoute("/api/chat")({
                   .map((p) => p.text ?? "")
                   .join("");
                 const patch = extractPatchFromText(text);
-                if (patch) {
+                if (patch || sceneAssignments.length) {
                   const { data: cur } = await supabaseAdmin
                     .from("projects")
                     .select("project_state, title")
                     .eq("id", projectId)
                     .maybeSingle();
                   if (cur) {
-                    const next = applyPatch(
+                    let next = applyPatch(
                       (cur.project_state as ProjectState) ?? INITIAL_PROJECT,
-                      patch as never,
+                      (patch as never) ?? null,
                     );
+                    // Map pika clips onto scenes. Prefer thumb-URL match in
+                    // the tool's input args; fall back to next scene without
+                    // a clipUrl.
+                    if (sceneAssignments.length) {
+                      const scenes = next.scenes.map((s) => ({ ...s }));
+                      let cursor = 0;
+                      for (const a of sceneAssignments) {
+                        let idx = -1;
+                        if (a.inputStr) {
+                          idx = scenes.findIndex(
+                            (s) =>
+                              !s.clipUrl &&
+                              s.thumb &&
+                              a.inputStr.includes(s.thumb),
+                          );
+                        }
+                        if (idx < 0) {
+                          while (
+                            cursor < scenes.length &&
+                            scenes[cursor].clipUrl
+                          )
+                            cursor++;
+                          if (cursor < scenes.length) {
+                            idx = cursor;
+                            cursor++;
+                          }
+                        }
+                        if (idx >= 0) {
+                          scenes[idx] = {
+                            ...scenes[idx],
+                            clipUrl: a.durableUrl,
+                            status: "ready",
+                          };
+                        }
+                      }
+                      next = { ...next, scenes };
+                    }
                     const patchTitle = (patch as { meta?: { title?: string } })
                       ?.meta?.title;
                     const newTitle =
@@ -824,6 +879,14 @@ export const Route = createFileRoute("/api/chat")({
             }
           },
         });
+
+        // Keep the stream running server-side even if the client disconnects
+        // mid-flight (long Pika tool calls). Without this, onFinish never
+        // runs when the user navigates away or the network blips, and the
+        // assistant message + clip URLs are lost.
+        void result.consumeStream();
+
+        return response;
       },
     },
   },
