@@ -316,6 +316,65 @@ function extractVideoAssets(out: unknown): ProjectAsset[] {
 
 // ---------- chat panel ----------
 
+function PikaCallChip({
+  call,
+}: {
+  call: {
+    name: string;
+    state: string;
+    input: unknown;
+    output: unknown;
+    videoCount: number;
+    errorText: string | null;
+  };
+}) {
+  const [open, setOpen] = useState(false);
+  const pending = call.state !== "output-available" && call.state !== "output-error";
+  const status = pending
+    ? "rendering…"
+    : call.errorText
+      ? "error"
+      : `${call.videoCount} video${call.videoCount === 1 ? "" : "s"}`;
+  const dot = pending
+    ? "bg-amber-400 animate-pulse"
+    : call.errorText
+      ? "bg-destructive"
+      : "bg-emerald-500";
+  return (
+    <div className="rounded-xl border border-border bg-background/40">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm"
+      >
+        <span className={`h-2 w-2 rounded-full ${dot}`} />
+        <span className="font-mono text-xs text-foreground">{call.name}</span>
+        <span className="text-xs text-muted-foreground">· {status}</span>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {open ? "hide" : "details"}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-border px-3 py-2 text-xs">
+          {call.errorText && (
+            <div className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-destructive">
+              {call.errorText}
+            </div>
+          )}
+          <div className="mb-1 font-medium text-muted-foreground">Input</div>
+          <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px]">
+            {JSON.stringify(call.input, null, 2)}
+          </pre>
+          <div className="mb-1 font-medium text-muted-foreground">Output</div>
+          <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px]">
+            {JSON.stringify(call.output, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STARTERS = [
   "Music video",
   "30-second product ad",
