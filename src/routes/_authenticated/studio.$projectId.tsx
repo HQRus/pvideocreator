@@ -212,8 +212,30 @@ function Studio() {
 
 // ---------- gallery rail (left, projects) ----------
 
-function FloatingGallery({ projectTitle }: { projectTitle: string }) {
+function FloatingGallery({
+  currentProjectId,
+  currentTitle,
+}: {
+  currentProjectId: string;
+  currentTitle: string;
+}) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const fetchList = useServerFn(listProjects);
+  const createNew = useServerFn(createProject);
+  const queryClient = useQueryClient();
+  const listQuery = useQuery({
+    queryKey: ["projects-list"],
+    queryFn: () => fetchList(),
+    enabled: open,
+  });
+  const onNew = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { id } = await createNew({ data: {} });
+    void queryClient.invalidateQueries({ queryKey: ["projects-list"] });
+    void navigate({ to: "/studio/$projectId", params: { id } as never });
+  };
+  const projects = listQuery.data?.projects ?? [];
   return (
     <aside
       onClick={() => {
@@ -247,19 +269,41 @@ function FloatingGallery({ projectTitle }: { projectTitle: string }) {
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         {open ? (
           <div className="flex flex-col gap-2">
+            {projects.length === 0 && listQuery.isLoading && (
+              <div className="px-2 py-4 text-xs text-muted-foreground">Loading…</div>
+            )}
+            {projects.map((p) => {
+              const isCurrent = p.id === currentProjectId;
+              const label = isCurrent ? currentTitle : p.title;
+              return (
+                <button
+                  key={p.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isCurrent)
+                      void navigate({
+                        to: "/studio/$projectId",
+                        params: { id: p.id } as never,
+                      });
+                  }}
+                  className={`flex items-center gap-3 rounded-2xl p-2 text-left ${
+                    isCurrent ? "bg-muted/70" : "hover:bg-muted/40"
+                  }`}
+                >
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-brand-gradient text-primary-foreground">
+                    <Film className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{label}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {isCurrent ? "Current project" : `${p.sceneCount} scene${p.sceneCount === 1 ? "" : "s"}`}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
             <button
-              className="flex items-center gap-3 rounded-2xl bg-muted/70 p-2 text-left"
-            >
-              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-brand-gradient text-primary-foreground">
-                <Film className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{projectTitle}</div>
-                <div className="truncate text-xs text-muted-foreground">Current project</div>
-              </div>
-            </button>
-            <button
-              onClick={(e) => e.stopPropagation()}
+              onClick={onNew}
               className="mt-1 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-3 text-sm font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
             >
               <Plus className="h-4 w-4" /> New project
@@ -268,7 +312,7 @@ function FloatingGallery({ projectTitle }: { projectTitle: string }) {
         ) : (
           <div className="flex flex-col items-center gap-2">
             <div
-              title={projectTitle}
+              title={currentTitle}
               className="grid h-12 w-12 place-items-center rounded-xl bg-brand-gradient text-primary-foreground"
             >
               <Film className="h-4 w-4" />
