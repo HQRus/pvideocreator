@@ -156,6 +156,20 @@ function Studio() {
 
   const handlePatch = (patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
+    // Optimistically bump this project to the top of the panel right away.
+    queryClient.setQueryData<{ projects: Array<{ id: string; updatedAt: string }> }>(
+      ["projects-list"],
+      (old) => {
+        if (!old?.projects) return old;
+        const now = new Date().toISOString();
+        const idx = old.projects.findIndex((p) => p.id === projectId);
+        if (idx === -1) return old;
+        const next = [...old.projects];
+        const [hit] = next.splice(idx, 1);
+        next.unshift({ ...hit, updatedAt: now });
+        return { ...old, projects: next };
+      },
+    );
     void updateState({ data: { id: projectId, patch } }).then(() => {
       void queryClient.invalidateQueries({ queryKey: ["projects-list"] });
     });
