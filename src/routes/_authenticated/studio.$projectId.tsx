@@ -235,7 +235,7 @@ function FloatingGallery({
     e.stopPropagation();
     const { id } = await createNew({ data: {} });
     void queryClient.invalidateQueries({ queryKey: ["projects-list"] });
-    void navigate({ to: "/studio/$projectId", params: { id } as never });
+    void navigate({ to: "/studio/$projectId", params: { projectId: id } });
   };
   type ProjectRow = {
     id: string;
@@ -295,7 +295,7 @@ function FloatingGallery({
                     if (!isCurrent)
                       void navigate({
                         to: "/studio/$projectId",
-                        params: { id: p.id } as never,
+                        params: { projectId: p.id },
                       });
                   }}
                   className={`flex items-center gap-3 rounded-2xl p-2 text-left ${
