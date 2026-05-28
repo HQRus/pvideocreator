@@ -435,17 +435,28 @@ const STARTERS = [
 ];
 
 function ChatPanel({
+  projectId,
+  initialMessages,
   onPatch,
   assets,
 }: {
+  projectId: string;
+  initialMessages: UIMessage[];
   onPatch: (patch: ProjectPatch) => void;
   assets: ProjectAsset[];
 }) {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat({
+    id: projectId,
+    messages: initialMessages,
+    generateId: () =>
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     transport: new DefaultChatTransport({
       api: "/api/chat",
       headers: () => buildAuthHeaders(),
+      body: () => ({ projectId }),
     }),
   });
 
