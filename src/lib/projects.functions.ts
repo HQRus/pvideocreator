@@ -188,7 +188,7 @@ export const getProject = createServerFn({ method: "GET" })
       messages: (msgRows ?? []).map((m) => ({
         id: m.id,
         role: m.role as "user" | "assistant",
-        parts: m.parts as unknown,
+        parts: (m.parts as unknown) as Record<string, unknown>[],
       })),
       assets,
     };
