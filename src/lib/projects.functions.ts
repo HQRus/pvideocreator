@@ -71,9 +71,35 @@ export const listProjects = createServerFn({ method: "GET" })
       .eq("user_id", userId)
       .order("updated_at", { ascending: false });
     if (error) throw new Error(error.message);
+    const projectIds = (data ?? []).map((p) => p.id);
+    // Pick one image-like asset per project to use as a circular thumbnail.
+    // Prefer rendered keyframes (kind = "video" w/ poster) and reference images.
+    const thumbByProject = new Map<string, string>();
+    if (projectIds.length) {
+      const { data: assetRows } = await supabaseAdmin
+        .from("project_assets")
+        .select("project_id, storage_path, url, mime, kind, created_at")
+        .in("project_id", projectIds)
+        .ilike("mime", "image/%")
+        .order("created_at", { ascending: true });
+      const firstByProject = new Map<string, { storage_path: string | null; url: string }>();
+      for (const row of assetRows ?? []) {
+        if (!firstByProject.has(row.project_id as string)) {
+          firstByProject.set(row.project_id as string, {
+            storage_path: (row.storage_path as string | null) ?? null,
+            url: (row.url as string) ?? "",
+          });
+        }
+      }
+      const rows = Array.from(firstByProject.entries());
+      const signed = await signAssetUrls(rows.map(([, r]) => r));
+      rows.forEach(([pid], i) => thumbByProject.set(pid, signed[i]));
+    }
     return {
       projects: (data ?? []).map((p) => {
         const state = (p.project_state as Partial<ProjectState>) ?? {};
+        // Fall back to first non-empty scene.thumb (already a URL string).
+        const sceneThumb = (state.scenes ?? []).find((s) => !!s?.thumb)?.thumb;
         return {
           id: p.id,
           title: p.title,
@@ -83,6 +109,7 @@ export const listProjects = createServerFn({ method: "GET" })
           format: state.meta?.format ?? "",
           aspectRatio: state.meta?.aspectRatio ?? "",
           sceneCount: state.scenes?.length ?? 0,
+          thumbnailUrl: thumbByProject.get(p.id) ?? sceneThumb ?? null,
         };
       }),
     };
