@@ -214,8 +214,25 @@ export const startRender = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
 
+    // Open one Pika MCP client up front if connected — reuse across scenes.
+    let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
+    let pikaTools: Record<string, unknown> | null = null;
+    try {
+      if ((await getPikaStatus(userId)) === "ready") {
+        const redirectUri = callbackUrlFromRequest(getRequest());
+        pikaClient = await openPikaMCPClient(userId, redirectUri);
+        pikaTools = (await pikaClient.tools()) as Record<string, unknown>;
+      }
+    } catch (err) {
+      console.warn("[render] failed to open Pika MCP client:", err);
+      pikaClient = null;
+      pikaTools = null;
+    }
+    const aspect = state.meta.aspectRatio || "16:9";
+
     let okCount = 0;
     let failCount = 0;
+    try {
     for (const scene of state.scenes) {
       // Mark this scene output as running.
       const { data: outRow } = await supabaseAdmin
@@ -235,15 +252,15 @@ export const startRender = createServerFn({ method: "POST" })
         const promptText =
           scene.prompt?.trim() ||
           `${state.meta.title || "Scene"} — ${scene.title}`;
-        const { b64, mime } = await gatewayKeyframe(promptText, key);
-        const stored = await storeAsset({
+        const stored = await generateAndStoreKeyframe({
           projectId: data.projectId,
           userId,
-          kind: "reference",
-          mime,
-          bytes: b64ToBytes(b64),
-          label: `Keyframe — ${scene.title}`,
-          attachedTo: scene.id,
+          sceneId: scene.id,
+          sceneTitle: scene.title,
+          promptText,
+          aspect,
+          pikaTools,
+          gatewayKey: key,
         });
 
         // Merge the new thumb into project_state by re-reading then patching.
@@ -273,6 +290,7 @@ export const startRender = createServerFn({ method: "POST" })
             .update({
               status: "done",
               asset_id: stored.id,
+              model: stored.model,
               finished_at: new Date().toISOString(),
             })
             .eq("id", outId);
@@ -292,6 +310,11 @@ export const startRender = createServerFn({ method: "POST" })
             .eq("id", outId);
         }
         console.error("[render] keyframe failed:", msg);
+      }
+    }
+    } finally {
+      if (pikaClient) {
+        try { await pikaClient.close(); } catch {}
       }
     }
 
