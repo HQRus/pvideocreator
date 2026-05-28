@@ -237,7 +237,17 @@ function FloatingGallery({
     void queryClient.invalidateQueries({ queryKey: ["projects-list"] });
     void navigate({ to: "/studio/$projectId", params: { id } as never });
   };
-  const projects = listQuery.data?.projects ?? [];
+  type ProjectRow = {
+    id: string;
+    title: string;
+    status: string;
+    updatedAt: string;
+    createdAt: string;
+    format: string;
+    aspectRatio: string;
+    sceneCount: number;
+  };
+  const projects: ProjectRow[] = (listQuery.data?.projects ?? []) as ProjectRow[];
   return (
     <aside
       onClick={() => {
