@@ -85,7 +85,7 @@ function ConnectGate() {
       const j = (await r.json()) as { state?: string; authUrl?: string };
       if (j.state === "ready") {
         setStatus("ready");
-        void navigate({ to: "/projects" });
+        void goToNewProject();
         return;
       }
       if (j.authUrl) {
@@ -102,7 +102,7 @@ function ConnectGate() {
                 pollRef.current = null;
               }
               setStatus("ready");
-              void navigate({ to: "/projects" });
+              void goToNewProject();
             }
           } catch {
             /* keep polling */
