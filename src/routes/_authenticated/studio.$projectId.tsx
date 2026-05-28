@@ -1225,10 +1225,19 @@ function StructurePanel({
           <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
             Export
           </button>
-          <button className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95">
-            Render
+          <button
+            onClick={onRender}
+            disabled={rendering}
+            className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
+          >
+            {rendering ? "Rendering…" : "Render"}
           </button>
         </div>
+        {renderMsg && (
+          <div className="pointer-events-auto mt-2 text-center text-xs text-muted-foreground">
+            {renderMsg}
+          </div>
+        )}
       </div>
     </div>
   );
