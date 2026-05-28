@@ -367,7 +367,7 @@ export function GenerativeCard({
       if (!list || list.length === 0) return;
       const assets: LiveAsset[] = [];
       for (const f of Array.from(list)) {
-        assets.push(await fileToAsset(f, input));
+        assets.push(await fileToAsset(f, input, projectId));
       }
       pendingFiles.set(input, assets);
       renderPreviewFor(input, assets);
@@ -410,7 +410,7 @@ export function GenerativeCard({
           const file = new File([blob], `capture-${Date.now()}.jpg`, {
             type: "image/jpeg",
           });
-          const asset = await fileToAsset(file, btn);
+          const asset = await fileToAsset(file, btn, projectId);
           onAnswer({ summary: describeAsset(asset), assets: [asset] });
         } else {
           // Audio capture — record until user clicks again.
@@ -423,7 +423,7 @@ export function GenerativeCard({
             const file = new File([blob], `voice-${Date.now()}.webm`, {
               type: "audio/webm",
             });
-            const asset = await fileToAsset(file, btn);
+            const asset = await fileToAsset(file, btn, projectId);
             asset.kind = "voice";
             onAnswer({ summary: describeAsset(asset), assets: [asset] });
           };
