@@ -1345,7 +1345,7 @@ function AssetsStrip({ assets }: { assets: ProjectAsset[] }) {
         {assets.map((a) => (
           <div
             key={a.id}
-            className="group relative overflow-hidden rounded-xl border border-border/60 bg-muted/40"
+            className="group relative overflow-hidden rounded-md border border-border/60 bg-muted/40"
             title={`${a.kind} · ${a.name}`}
           >
             {a.mime.startsWith("image/") ? (
@@ -1355,8 +1355,10 @@ function AssetsStrip({ assets }: { assets: ProjectAsset[] }) {
                 {a.mime.startsWith("audio/") ? "♪" : a.mime.startsWith("video/") ? "▶" : "•"}
               </div>
             )}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent px-1.5 pb-1 pt-3 text-[9px] font-semibold capitalize text-foreground">
-              {a.kind}
+            <div className="pointer-events-none absolute inset-x-0 bottom-1 flex justify-center">
+              <span className="rounded-full bg-black/70 px-2 py-0.5 text-[9px] font-semibold capitalize text-white backdrop-blur-sm">
+                {a.kind}
+              </span>
             </div>
           </div>
         ))}
