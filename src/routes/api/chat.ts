@@ -15,6 +15,8 @@ import {
   openPikaMCPClient,
 } from "@/lib/pika-mcp.server";
 import { requireUser, unauthorizedResponse } from "@/lib/auth-route.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { applyPatch, INITIAL_PROJECT, type ProjectState } from "@/lib/project-state";
 
 // ---------- Tool implementations ----------
 
@@ -440,7 +442,19 @@ in project state — do NOT also list them in assetsAppend, just reference
 them by id.
 `;
 
-type ChatRequestBody = { messages?: unknown };
+type ChatRequestBody = { messages?: unknown; projectId?: unknown };
+
+function extractPatchFromText(text: string): unknown | null {
+  const m = text.match(
+    /<script[^>]*data-project-patch[^>]*>([\s\S]*?)<\/script>/i,
+  );
+  if (!m) return null;
+  try {
+    return JSON.parse(m[1].trim());
+  } catch {
+    return null;
+  }
+}
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -454,9 +468,39 @@ export const Route = createFileRoute("/api/chat")({
             err instanceof Error ? err.message : "Unauthorized",
           );
         }
-        const { messages } = (await request.json()) as ChatRequestBody;
+        const { messages, projectId } = (await request.json()) as ChatRequestBody;
         if (!Array.isArray(messages)) {
           return new Response("Messages are required", { status: 400 });
+        }
+        if (typeof projectId !== "string" || !projectId) {
+          return new Response("projectId is required", { status: 400 });
+        }
+
+        // Verify ownership.
+        const { data: ownership } = await supabaseAdmin
+          .from("projects")
+          .select("id")
+          .eq("id", projectId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!ownership) {
+          return new Response("Project not found", { status: 404 });
+        }
+
+        // Persist the latest user message before streaming.
+        const lastUser = (messages as UIMessage[])[messages.length - 1];
+        if (lastUser?.role === "user" && lastUser.id) {
+          await supabaseAdmin
+            .from("project_messages")
+            .upsert(
+              {
+                id: lastUser.id,
+                project_id: projectId,
+                role: "user",
+                parts: lastUser.parts as unknown as never,
+              },
+              { onConflict: "id" },
+            );
         }
         const key = process.env.LOVABLE_API_KEY;
         if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
@@ -611,6 +655,59 @@ export const Route = createFileRoute("/api/chat")({
 
         return result.toUIMessageStreamResponse({
           originalMessages: messages as UIMessage[],
+          onFinish: async ({ messages: all }) => {
+            const lastAssistant = all[all.length - 1];
+            if (lastAssistant?.role === "assistant" && lastAssistant.id) {
+              try {
+                await supabaseAdmin
+                  .from("project_messages")
+                  .upsert(
+                    {
+                      id: lastAssistant.id,
+                      project_id: projectId,
+                      role: "assistant",
+                      parts: lastAssistant.parts as unknown as never,
+                    },
+                    { onConflict: "id" },
+                  );
+                // Apply embedded project patch (if any) to project_state.
+                const text = (lastAssistant.parts as Array<{ type: string; text?: string }>)
+                  .filter((p) => p.type === "text")
+                  .map((p) => p.text ?? "")
+                  .join("");
+                const patch = extractPatchFromText(text);
+                if (patch) {
+                  const { data: cur } = await supabaseAdmin
+                    .from("projects")
+                    .select("project_state, title")
+                    .eq("id", projectId)
+                    .maybeSingle();
+                  if (cur) {
+                    const next = applyPatch(
+                      (cur.project_state as ProjectState) ?? INITIAL_PROJECT,
+                      patch as never,
+                    );
+                    const patchTitle = (patch as { meta?: { title?: string } })
+                      ?.meta?.title;
+                    const newTitle =
+                      patchTitle && patchTitle.trim()
+                        ? patchTitle.trim()
+                        : cur.title;
+                    await supabaseAdmin
+                      .from("projects")
+                      .update({
+                        project_state: next as unknown as never,
+                        title: newTitle,
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq("id", projectId);
+                  }
+                }
+              } catch (err) {
+                console.error("[chat] persist assistant failed:", err);
+              }
+            }
+          },
         });
       },
     },

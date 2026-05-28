@@ -40,7 +40,7 @@ function ConnectGate() {
       const j = (await r.json()) as { state?: string };
       if (j.state === "ready") {
         setStatus("ready");
-        void navigate({ to: "/studio" });
+        void navigate({ to: "/projects" });
       } else {
         setStatus("disconnected");
       }
@@ -73,7 +73,7 @@ function ConnectGate() {
       const j = (await r.json()) as { state?: string; authUrl?: string };
       if (j.state === "ready") {
         setStatus("ready");
-        void navigate({ to: "/studio" });
+        void navigate({ to: "/projects" });
         return;
       }
       if (j.authUrl) {
@@ -90,7 +90,7 @@ function ConnectGate() {
                 pollRef.current = null;
               }
               setStatus("ready");
-              void navigate({ to: "/studio" });
+              void navigate({ to: "/projects" });
             }
           } catch {
             /* keep polling */
