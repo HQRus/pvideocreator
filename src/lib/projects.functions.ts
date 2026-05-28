@@ -10,9 +10,11 @@ import {
   applyPatch,
   INITIAL_PROJECT,
   type ProjectAsset,
+  type AssetKind,
   type ProjectPatch,
   type ProjectState,
 } from "@/lib/project-state";
+import { storeAsset } from "@/lib/project-assets.server";
 
 // JSON type that satisfies TanStack's serializability check.
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
