@@ -242,6 +242,26 @@ export async function getStatus(userId: string): Promise<"ready" | "disconnected
 }
 
 /**
+ * The Pika OAuth callback redirects into a new browser tab/window that does
+ * NOT share the app's Supabase session (the SDK persists to localStorage,
+ * not cookies). To still associate the callback with the right user, we
+ * look the user up by the `state` value we previously stored in their
+ * pika_connections row.
+ */
+export async function findUserIdByOAuthState(state: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("pika_connections" as never)
+    .select("user_id")
+    .eq("oauth_state", state)
+    .maybeSingle();
+  if (error) {
+    console.error("[pika] findUserIdByOAuthState error:", error);
+    return null;
+  }
+  return ((data as { user_id?: string } | null)?.user_id) ?? null;
+}
+
+/**
  * Open a short-lived MCP client for the lifetime of one chat turn.
  * Caller is responsible for closing it.
  */
