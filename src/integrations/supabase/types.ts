@@ -25,6 +25,7 @@ export type Database = {
           server_url: string
           tokens: Json | null
           updated_at: string
+          user_id: string
         }
         Insert: {
           client_information?: Json | null
@@ -36,6 +37,7 @@ export type Database = {
           server_url: string
           tokens?: Json | null
           updated_at?: string
+          user_id: string
         }
         Update: {
           client_information?: Json | null
@@ -47,8 +49,244 @@ export type Database = {
           server_url?: string
           tokens?: Json | null
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
+      }
+      project_assets: {
+        Row: {
+          attached_to: string | null
+          created_at: string
+          duration: number | null
+          height: number | null
+          id: string
+          kind: string
+          label: string | null
+          mime: string
+          name: string
+          project_id: string
+          storage_path: string | null
+          url: string
+          width: number | null
+        }
+        Insert: {
+          attached_to?: string | null
+          created_at?: string
+          duration?: number | null
+          height?: number | null
+          id?: string
+          kind: string
+          label?: string | null
+          mime: string
+          name: string
+          project_id: string
+          storage_path?: string | null
+          url: string
+          width?: number | null
+        }
+        Update: {
+          attached_to?: string | null
+          created_at?: string
+          duration?: number | null
+          height?: number | null
+          id?: string
+          kind?: string
+          label?: string | null
+          mime?: string
+          name?: string
+          project_id?: string
+          storage_path?: string | null
+          url?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_messages: {
+        Row: {
+          created_at: string
+          id: string
+          parts: Json
+          project_id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parts: Json
+          project_id: string
+          role: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parts?: Json
+          project_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_messages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          project_state: Json
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_state?: Json
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_state?: Json
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      render_jobs: {
+        Row: {
+          created_at: string
+          error: string | null
+          final_asset_id: string | null
+          finished_at: string | null
+          id: string
+          project_id: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          final_asset_id?: string | null
+          finished_at?: string | null
+          id?: string
+          project_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          final_asset_id?: string | null
+          finished_at?: string | null
+          id?: string
+          project_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_jobs_final_asset_id_fkey"
+            columns: ["final_asset_id"]
+            isOneToOne: false
+            referencedRelation: "project_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "render_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_scene_outputs: {
+        Row: {
+          asset_id: string | null
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          model: string | null
+          prompt: string | null
+          render_job_id: string
+          scene_id: string
+          scene_n: number | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          asset_id?: string | null
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kind: string
+          model?: string | null
+          prompt?: string | null
+          render_job_id: string
+          scene_id: string
+          scene_n?: number | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string | null
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          model?: string | null
+          prompt?: string | null
+          render_job_id?: string
+          scene_id?: string
+          scene_n?: number | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_scene_outputs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "project_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "render_scene_outputs_render_job_id_fkey"
+            columns: ["render_job_id"]
+            isOneToOne: false
+            referencedRelation: "render_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
