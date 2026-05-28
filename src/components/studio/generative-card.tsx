@@ -259,6 +259,26 @@ export function GenerativeCard({
           }
         });
     }
+    // Defensive scrub: the model occasionally emits empty media placeholders
+    // (an <img> with no src, an unresolved data-asset-ref, or an empty
+    // <video>/<source>) inside handoff cards. They render as blank white
+    // rectangles. Strip them so the card shows just prose + actions.
+    if (root) {
+      root
+        .querySelectorAll<HTMLImageElement>("img")
+        .forEach((img) => {
+          const src = img.getAttribute("src");
+          const ref = img.getAttribute("data-asset-ref");
+          const hasSrc = !!src && src.trim() !== "";
+          const hasResolvedRef =
+            !!ref && !!assets?.some((a) => a.id === ref);
+          if (!hasSrc && !hasResolvedRef) img.remove();
+        });
+      root.querySelectorAll<HTMLElement>("video, source").forEach((el) => {
+        const src = el.getAttribute("src");
+        if (!src || src.trim() === "") el.remove();
+      });
+    }
     if (!root || disabled) return;
 
     // Track files attached to inputs in this card (form not yet submitted).
