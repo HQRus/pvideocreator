@@ -6,6 +6,11 @@ export type Scene = {
   duration: number;
   thumb: string;
   status: "ready" | "drafting" | "rendering";
+  // Motion / camera direction used when generating the video clip from
+  // the keyframe (e.g. "slow push-in, handheld, board flicks up at 0:02").
+  motionPrompt?: string;
+  // URL of the rendered video clip for this scene, once production finishes.
+  clipUrl?: string;
 };
 
 export type Character = {
@@ -110,6 +115,8 @@ function normalizeScene(s: Partial<Scene>, fallbackN: number): Scene {
     duration: typeof s.duration === "number" ? s.duration : 5,
     thumb: s.thumb ?? "",
     status: s.status ?? "drafting",
+    motionPrompt: s.motionPrompt,
+    clipUrl: s.clipUrl,
   };
 }
 

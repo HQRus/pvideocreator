@@ -12,7 +12,10 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
-import { startRender } from "@/lib/render.functions";
+// startRender is intentionally not used anymore — the chat AI now drives
+// keyframe + production rendering through its tool calls (generate_image
+// for keyframes, pika_* for video). The "Generate keyframes" and "Go to
+// production" buttons send a directive into the chat.
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
@@ -176,6 +179,11 @@ function Studio() {
     });
   };
 
+  // The Render / Production buttons live in the right-hand StructurePanel
+  // but need to dispatch into the chat (which owns the AI SDK session).
+  // We expose a ref the ChatPanel registers its sender into.
+  const chatSendRef = useRef<((text: string) => void) | null>(null);
+
   const setScenes = (next: Scene[]) =>
     setProject((prev) => ({ ...prev, scenes: next }));
 
@@ -216,6 +224,9 @@ function Studio() {
             initialMessages={initialMessages}
             onPatch={handlePatch}
             assets={assets}
+            registerSender={(fn) => {
+              chatSendRef.current = fn;
+            }}
           />
         </div>
       </div>
@@ -239,6 +250,7 @@ function Studio() {
             activeSceneId={activeSceneId}
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
+            onChatCommand={(text) => chatSendRef.current?.(text)}
           />
         </div>
       </aside>
@@ -604,11 +616,13 @@ function ChatPanel({
   initialMessages,
   onPatch,
   assets,
+  registerSender,
 }: {
   projectId: string;
   initialMessages: UIMessage[];
   onPatch: (patch: ProjectPatch) => void;
   assets: ProjectAsset[];
+  registerSender?: (fn: (text: string) => void) => void;
 }) {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat({
@@ -633,6 +647,15 @@ function ChatPanel({
     setInput("");
     await sendMessage({ text: trimmed });
   };
+
+  // Expose our sender to the parent so the right-hand panel buttons can
+  // dispatch directives into the chat (keyframes / production).
+  useEffect(() => {
+    registerSender?.((text: string) => {
+      void handleSend(text);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSender, busy]);
 
   // Card answers can also carry uploaded assets. Patch them into project
   // state immediately so the panel reflects the upload, then send a
@@ -1021,6 +1044,7 @@ function SceneTile({
   onClick: () => void;
 }) {
   const isRendering = scene.status === "rendering";
+  const hasClip = !!scene.clipUrl;
   return (
     <button
       onClick={onClick}
@@ -1031,7 +1055,19 @@ function SceneTile({
       }`}
     >
       <div className="relative aspect-[9/16] overflow-hidden bg-muted">
-        {scene.thumb ? (
+        {hasClip ? (
+          <video
+            src={scene.clipUrl}
+            className="h-full w-full object-cover"
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            onMouseEnter={(e) => void (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
+            onMouseLeave={(e) => (e.currentTarget as HTMLVideoElement).pause()}
+            poster={scene.thumb || undefined}
+          />
+        ) : scene.thumb ? (
           <img
             src={scene.thumb}
             alt={scene.title}
@@ -1098,6 +1134,7 @@ function StructurePanel({
   activeSceneId,
   onSelect,
   totalDuration,
+  onChatCommand,
 }: {
   projectId: string;
   meta: {
@@ -1117,31 +1154,45 @@ function StructurePanel({
   activeSceneId: string;
   onSelect: (id: string) => void;
   totalDuration: number;
+  onChatCommand?: (text: string) => void;
 }) {
-  const startRenderFn = useServerFn(startRender);
-  const [rendering, setRendering] = useState(false);
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
-  const onRender = async () => {
-    if (rendering) return;
+  void projectId; // reserved for future direct panel actions
+  const missingKeyframes = scenes.filter((s) => !s.thumb).length;
+  const missingClips = scenes.filter((s) => !s.clipUrl).length;
+  const onGenerateKeyframes = () => {
     if (scenes.length === 0) {
-      setRenderMsg("Add at least one scene first.");
+      setRenderMsg("Draft at least one scene first — describe the concept in chat.");
       return;
     }
-    setRendering(true);
-    setRenderMsg("Generating keyframes…");
-    try {
-      const r = await startRenderFn({ data: { projectId } });
-      setRenderMsg(
-        r.failCount === 0
-          ? `Rendered ${r.okCount} keyframe${r.okCount === 1 ? "" : "s"}.`
-          : `${r.okCount} ok, ${r.failCount} failed.`,
-      );
-    } catch (e) {
-      setRenderMsg(e instanceof Error ? e.message : "Render failed.");
-    } finally {
-      setRendering(false);
-    }
+    setRenderMsg("Asked the director to generate keyframes.");
+    onChatCommand?.(
+      `GENERATE KEYFRAMES NOW for every scene that doesn't already have one. ` +
+      `For each such scene, call the generate_image tool with a vivid, cinematic prompt that bakes in: ` +
+      `(1) the project logline, (2) the scene title + scene prompt, (3) the cast notes & any uploaded ` +
+      `likeness/reference assets, and (4) a consistent visual style across all keyframes. ` +
+      `After each image returns, emit a commit_project_patch that updates scenes[i].thumb to the new ` +
+      `asset URL (and sets status to "ready"). Do all scenes in this turn. Final card: a short handoff ` +
+      `confirming how many keyframes were generated.`,
+    );
   };
+  const onGoToProduction = () => {
+    if (scenes.length === 0) {
+      setRenderMsg("Draft at least one scene first.");
+      return;
+    }
+    setRenderMsg("Asked the director to render scenes via Pika.");
+    onChatCommand?.(
+      `GO TO PRODUCTION. Render every scene that doesn't already have a clipUrl into an actual video clip ` +
+      `using the available pika_* tools (prefer pika_generate_keyframes_video when a keyframe exists, ` +
+      `otherwise pika_generate_video). For each scene pass: the keyframe image (asset URL) as the starting ` +
+      `frame when supported, the scene's motionPrompt (or scene prompt as fallback) as the motion/camera ` +
+      `direction, and the scene duration. As each clip returns, emit a commit_project_patch updating ` +
+      `scenes[i].clipUrl and scenes[i].status. If no pika_* tools are available, tell the user the Pika ` +
+      `connection is missing. Final card: a short handoff listing which scenes rendered successfully.`,
+    );
+  };
+  const rendering = false;
   return (
     <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
@@ -1211,14 +1262,20 @@ function StructurePanel({
             {cast.length === 0 && (
               <EmptyHint icon={<Users className="h-8 w-8" />} text="No cast yet — ask the director to suggest characters." />
             )}
-            {cast.map((c) => (
+            {cast.map((c) => {
+              // c.ref is an asset id (ast_xxx) — resolve it against the
+              // project's assets list so the uploaded selfie/likeness shows.
+              const refUrl =
+                (c.ref && assets.find((a) => a.id === c.ref)?.url) ||
+                (c.ref && /^https?:|^blob:|^\//.test(c.ref) ? c.ref : "");
+              return (
               <div
                 key={c.id}
                 className="flex gap-5 rounded-2xl border border-border/60 bg-card/40 p-5"
               >
-                {c.ref ? (
+                {refUrl ? (
                   <img
-                    src={c.ref}
+                    src={refUrl}
                     alt={c.name}
                     className="h-20 w-20 shrink-0 rounded-2xl object-cover"
                   />
@@ -1239,7 +1296,8 @@ function StructurePanel({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
             <button className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card/30 py-5 text-base font-semibold text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground">
               <ImagePlus className="h-5 w-5" /> Add character / reference
             </button>
@@ -1307,18 +1365,29 @@ function StructurePanel({
       {/* Floating sticky action bar */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
-            Share
-          </button>
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
-            Export
+          <button
+            onClick={onGenerateKeyframes}
+            disabled={rendering}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-sm font-bold tracking-tight text-foreground transition hover:bg-muted disabled:opacity-60"
+            title={
+              missingKeyframes > 0
+                ? `${missingKeyframes} scene${missingKeyframes === 1 ? "" : "s"} missing a keyframe`
+                : "All scenes have keyframes"
+            }
+          >
+            Keyframes{missingKeyframes > 0 ? ` · ${missingKeyframes}` : ""}
           </button>
           <button
-            onClick={onRender}
+            onClick={onGoToProduction}
             disabled={rendering}
-            className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
+            className="flex flex-[1.6] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
+            title={
+              missingClips > 0
+                ? `${missingClips} scene${missingClips === 1 ? "" : "s"} not yet rendered`
+                : "All scenes rendered"
+            }
           >
-            {rendering ? "Rendering…" : "Render"}
+            Go to production{missingClips > 0 ? ` · ${missingClips}` : ""}
           </button>
         </div>
         {renderMsg && (
