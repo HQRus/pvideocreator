@@ -72,6 +72,7 @@ export const Route = createFileRoute("/_authenticated/studio/$projectId")({
 
 function Studio() {
   const navigate = useNavigate();
+  const { projectId } = Route.useParams();
   const [gate, setGate] = useState<"checking" | "ready">("checking");
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +92,31 @@ function Studio() {
     };
   }, [navigate]);
 
+  const fetchProject = useServerFn(getProject);
+  const updateState = useServerFn(updateProjectState);
+  const queryClient = useQueryClient();
+  const projectQuery = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => fetchProject({ data: { id: projectId } }),
+    enabled: gate === "ready",
+    staleTime: Infinity,
+  });
+
   const [project, setProject] = useState<ProjectState>(INITIAL_PROJECT);
+  useEffect(() => {
+    if (projectQuery.data?.project.projectState) {
+      setProject(projectQuery.data.project.projectState);
+    }
+  }, [projectQuery.data?.project.id]);
+
+  const initialMessages: UIMessage[] = (projectQuery.data?.messages ?? []).map(
+    (m) => ({
+      id: m.id,
+      role: m.role,
+      parts: (Array.isArray(m.parts) ? m.parts : []) as UIMessage["parts"],
+    }),
+  ) as UIMessage[];
+
   const [activeSceneId, setActiveSceneId] = useState<string>(
     INITIAL_PROJECT.scenes[0]?.id ?? "",
   );
@@ -101,15 +126,30 @@ function Studio() {
 
   const handlePatch = (patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
+    void updateState({ data: { id: projectId, patch } }).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ["projects-list"] });
+    });
   };
 
   const setScenes = (next: Scene[]) =>
     setProject((prev) => ({ ...prev, scenes: next }));
 
-  if (gate !== "ready") {
+  if (gate !== "ready" || projectQuery.isLoading) {
     return (
       <div className="grid h-screen w-full place-items-center bg-background text-sm text-muted-foreground">
-        Checking Pika connection…
+        {gate !== "ready" ? "Checking Pika connection…" : "Loading project…"}
+      </div>
+    );
+  }
+  if (projectQuery.isError) {
+    return (
+      <div className="grid h-screen w-full place-items-center bg-background text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div>Couldn't load this project.</div>
+          <Link to="/projects" className="text-primary underline">
+            Back to projects
+          </Link>
+        </div>
       </div>
     );
   }
