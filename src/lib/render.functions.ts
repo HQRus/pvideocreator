@@ -19,6 +19,7 @@ import {
   downloadAndStoreUrl,
   sweepCandidateVideoUrls,
 } from "@/lib/project-assets.server";
+import { sweepCandidateImageUrls } from "@/lib/project-assets.server";
 import {
   callbackUrlFromRequest,
   getStatus as getPikaStatus,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/pika-mcp.server";
 
 const KEYFRAME_MODEL = "google/gemini-2.5-flash-image";
+const PIKA_KEYFRAME_MODEL = "pika:generate_image";
 
 async function ownProject(projectId: string, userId: string) {
   const { data, error } = await supabaseAdmin
