@@ -529,11 +529,15 @@ export const Route = createFileRoute("/api/chat")({
             const pikaTools = await pikaClient.tools();
             for (const [name, t] of Object.entries(pikaTools)) {
               const key = `pika_${name}`;
-              const original = t as { execute?: (args: unknown, ctx: unknown) => Promise<unknown> };
-              const origExec = original.execute?.bind(original);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const original = t as any;
+              const origExec: ((args: unknown, ctx: unknown) => unknown) | undefined =
+                typeof original.execute === "function"
+                  ? original.execute.bind(original)
+                  : undefined;
               tools[key] = origExec
                 ? {
-                    ...(t as object),
+                    ...original,
                     execute: async (args: unknown, ctx: unknown) => {
                       const start = Date.now();
                       const argSummary = JSON.stringify(args).slice(0, 400);
