@@ -3,6 +3,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import symbolLogo from "@/assets/symbol.svg";
+import { fetchWithAuth, buildAuthHeaders } from "@/lib/fetch-with-auth";
 import {
   Play,
   Pause,
@@ -70,7 +71,7 @@ function Studio() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch("/api/pika/status");
+        const r = await fetchWithAuth("/api/pika/status");
         const j = (await r.json()) as { state?: string };
         if (cancelled) return;
         if (j.state === "ready") setGate("ready");
