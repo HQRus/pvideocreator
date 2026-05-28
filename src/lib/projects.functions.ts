@@ -14,6 +14,9 @@ import {
   type ProjectState,
 } from "@/lib/project-state";
 
+// JSON type that satisfies TanStack's serializability check.
+type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
+
 const BUCKET = "project-assets";
 const SIGNED_URL_TTL = 60 * 60 * 24 * 7; // 7 days
 
@@ -188,7 +191,7 @@ export const getProject = createServerFn({ method: "GET" })
       messages: (msgRows ?? []).map((m) => ({
         id: m.id,
         role: m.role as "user" | "assistant",
-        parts: (m.parts as unknown) as Record<string, unknown>[],
+        parts: m.parts as Json,
       })),
       assets,
     };
