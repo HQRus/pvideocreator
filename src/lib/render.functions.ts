@@ -375,19 +375,34 @@ export const retryRenderScene = createServerFn({ method: "POST" })
       .eq("id", out.id as string);
 
     try {
-      const { b64, mime } = await gatewayKeyframe(
-        (out.prompt as string) || scene.prompt || scene.title,
-        key,
-      );
-      const stored = await storeAsset({
-        projectId: job.project_id as string,
-        userId,
-        kind: "reference",
-        mime,
-        bytes: b64ToBytes(b64),
-        label: `Keyframe — ${scene.title}`,
-        attachedTo: scene.id,
-      });
+      let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
+      let pikaTools: Record<string, unknown> | null = null;
+      try {
+        if ((await getPikaStatus(userId)) === "ready") {
+          const redirectUri = callbackUrlFromRequest(getRequest());
+          pikaClient = await openPikaMCPClient(userId, redirectUri);
+          pikaTools = (await pikaClient.tools()) as Record<string, unknown>;
+        }
+      } catch (err) {
+        console.warn("[render] retry: failed to open Pika MCP client:", err);
+      }
+      let stored;
+      try {
+        stored = await generateAndStoreKeyframe({
+          projectId: job.project_id as string,
+          userId,
+          sceneId: scene.id,
+          sceneTitle: scene.title,
+          promptText: (out.prompt as string) || scene.prompt || scene.title,
+          aspect: state.meta.aspectRatio || "16:9",
+          pikaTools,
+          gatewayKey: key,
+        });
+      } finally {
+        if (pikaClient) {
+          try { await pikaClient.close(); } catch {}
+        }
+      }
       const nextScenes = state.scenes.map((s) =>
         s.id === scene.id
           ? { ...s, thumb: stored.url, status: "ready" as const }
@@ -406,6 +421,7 @@ export const retryRenderScene = createServerFn({ method: "POST" })
         .update({
           status: "done",
           asset_id: stored.id,
+          model: stored.model,
           finished_at: new Date().toISOString(),
         })
         .eq("id", out.id as string);
