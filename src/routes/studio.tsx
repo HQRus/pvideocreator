@@ -495,15 +495,14 @@ function ChatPanel({
               />
             ),
           )}
-          {activeCard && (
-            <AssistantMessage
-              key={`q-${activeCard.key}`}
-              text={
-                extractCardProse(activeCard.html) ||
-                extractCardTitle(activeCard.html)
-              }
-            />
-          )}
+          {activeCard && (() => {
+            const text =
+              extractCardProse(activeCard.html) ||
+              extractCardTitle(activeCard.html);
+            return text ? (
+              <AssistantMessage key={`q-${activeCard.key}`} text={text} />
+            ) : null;
+          })()}
           {busy && (
             <Shimmer>
               {pendingTools.length
