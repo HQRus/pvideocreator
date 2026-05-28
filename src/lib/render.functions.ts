@@ -19,6 +19,7 @@ import {
   downloadAndStoreUrl,
   sweepCandidateVideoUrls,
 } from "@/lib/project-assets.server";
+import { sweepCandidateImageUrls } from "@/lib/project-assets.server";
 import {
   callbackUrlFromRequest,
   getStatus as getPikaStatus,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/pika-mcp.server";
 
 const KEYFRAME_MODEL = "google/gemini-2.5-flash-image";
+const PIKA_KEYFRAME_MODEL = "pika:generate_image";
 
 async function ownProject(projectId: string, userId: string) {
   const { data, error } = await supabaseAdmin
@@ -88,6 +90,83 @@ function b64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
+// ─── Pika-based keyframe generation ─────────────────────────────────────
+// Pika MCP exposes `generate_image` (default provider: nano-banana-pro).
+// When the user has connected Pika we use it for keyframes instead of the
+// Lovable AI gateway so the entire pipeline runs on one provider.
+
+async function pikaGenerateImage(
+  tools: Record<string, unknown>,
+  promptText: string,
+  aspect: string,
+): Promise<string> {
+  const tool = tools["generate_image"] as
+    | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
+    | undefined;
+  if (!tool?.execute) throw new Error("Pika tool 'generate_image' not available");
+  const keys = schemaKeys(tool.inputSchema);
+  const args: Record<string, unknown> = {};
+  setFirst(args, keys, ["prompt", "promptText", "text", "description"], promptText);
+  setFirst(args, keys, ["aspect_ratio", "aspectRatio", "aspect"], aspect);
+  const out = await tool.execute(args, {});
+  let urls = sweepCandidateImageUrls(out);
+  if (urls.length === 0) {
+    const taskId = extractTaskId(out);
+    if (taskId) {
+      urls = await pollPikaTask(tools, taskId, {
+        timeoutMs: 5 * 60_000,
+        intervalMs: 4_000,
+        sweep: sweepCandidateImageUrls,
+      });
+    }
+  }
+  if (urls.length === 0) throw new Error("Pika generate_image returned no image URL");
+  return urls[0];
+}
+
+type StoredKeyframe = { id: string; url: string; model: string };
+
+async function generateAndStoreKeyframe(opts: {
+  projectId: string;
+  userId: string;
+  sceneId: string;
+  sceneTitle: string;
+  promptText: string;
+  aspect: string;
+  pikaTools: Record<string, unknown> | null;
+  gatewayKey: string;
+}): Promise<StoredKeyframe> {
+  if (opts.pikaTools && opts.pikaTools["generate_image"]) {
+    try {
+      const url = await pikaGenerateImage(opts.pikaTools, opts.promptText, opts.aspect);
+      const stored = await downloadAndStoreUrl({
+        projectId: opts.projectId,
+        userId: opts.userId,
+        sourceUrl: url,
+        kind: "reference",
+        label: `Keyframe — ${opts.sceneTitle}`,
+        fallbackMime: "image/png",
+      });
+      return { id: stored.id, url: stored.url, model: PIKA_KEYFRAME_MODEL };
+    } catch (err) {
+      console.warn(
+        `[render] pika generate_image failed, falling back to gateway: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+  const { b64, mime } = await gatewayKeyframe(opts.promptText, opts.gatewayKey);
+  const stored = await storeAsset({
+    projectId: opts.projectId,
+    userId: opts.userId,
+    kind: "reference",
+    mime,
+    bytes: b64ToBytes(b64),
+    label: `Keyframe — ${opts.sceneTitle}`,
+    attachedTo: opts.sceneId,
+  });
+  return { id: stored.id, url: stored.url, model: KEYFRAME_MODEL };
+}
+
 export const startRender = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { projectId: string }) =>
@@ -135,8 +214,25 @@ export const startRender = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
 
+    // Open one Pika MCP client up front if connected — reuse across scenes.
+    let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
+    let pikaTools: Record<string, unknown> | null = null;
+    try {
+      if ((await getPikaStatus(userId)) === "ready") {
+        const redirectUri = callbackUrlFromRequest(getRequest());
+        pikaClient = await openPikaMCPClient(userId, redirectUri);
+        pikaTools = (await pikaClient.tools()) as Record<string, unknown>;
+      }
+    } catch (err) {
+      console.warn("[render] failed to open Pika MCP client:", err);
+      pikaClient = null;
+      pikaTools = null;
+    }
+    const aspect = state.meta.aspectRatio || "16:9";
+
     let okCount = 0;
     let failCount = 0;
+    try {
     for (const scene of state.scenes) {
       // Mark this scene output as running.
       const { data: outRow } = await supabaseAdmin
@@ -156,15 +252,15 @@ export const startRender = createServerFn({ method: "POST" })
         const promptText =
           scene.prompt?.trim() ||
           `${state.meta.title || "Scene"} — ${scene.title}`;
-        const { b64, mime } = await gatewayKeyframe(promptText, key);
-        const stored = await storeAsset({
+        const stored = await generateAndStoreKeyframe({
           projectId: data.projectId,
           userId,
-          kind: "reference",
-          mime,
-          bytes: b64ToBytes(b64),
-          label: `Keyframe — ${scene.title}`,
-          attachedTo: scene.id,
+          sceneId: scene.id,
+          sceneTitle: scene.title,
+          promptText,
+          aspect,
+          pikaTools,
+          gatewayKey: key,
         });
 
         // Merge the new thumb into project_state by re-reading then patching.
@@ -194,6 +290,7 @@ export const startRender = createServerFn({ method: "POST" })
             .update({
               status: "done",
               asset_id: stored.id,
+              model: stored.model,
               finished_at: new Date().toISOString(),
             })
             .eq("id", outId);
@@ -213,6 +310,11 @@ export const startRender = createServerFn({ method: "POST" })
             .eq("id", outId);
         }
         console.error("[render] keyframe failed:", msg);
+      }
+    }
+    } finally {
+      if (pikaClient) {
+        try { await pikaClient.close(); } catch {}
       }
     }
 
@@ -273,19 +375,34 @@ export const retryRenderScene = createServerFn({ method: "POST" })
       .eq("id", out.id as string);
 
     try {
-      const { b64, mime } = await gatewayKeyframe(
-        (out.prompt as string) || scene.prompt || scene.title,
-        key,
-      );
-      const stored = await storeAsset({
-        projectId: job.project_id as string,
-        userId,
-        kind: "reference",
-        mime,
-        bytes: b64ToBytes(b64),
-        label: `Keyframe — ${scene.title}`,
-        attachedTo: scene.id,
-      });
+      let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
+      let pikaTools: Record<string, unknown> | null = null;
+      try {
+        if ((await getPikaStatus(userId)) === "ready") {
+          const redirectUri = callbackUrlFromRequest(getRequest());
+          pikaClient = await openPikaMCPClient(userId, redirectUri);
+          pikaTools = (await pikaClient.tools()) as Record<string, unknown>;
+        }
+      } catch (err) {
+        console.warn("[render] retry: failed to open Pika MCP client:", err);
+      }
+      let stored;
+      try {
+        stored = await generateAndStoreKeyframe({
+          projectId: job.project_id as string,
+          userId,
+          sceneId: scene.id,
+          sceneTitle: scene.title,
+          promptText: (out.prompt as string) || scene.prompt || scene.title,
+          aspect: state.meta.aspectRatio || "16:9",
+          pikaTools,
+          gatewayKey: key,
+        });
+      } finally {
+        if (pikaClient) {
+          try { await pikaClient.close(); } catch {}
+        }
+      }
       const nextScenes = state.scenes.map((s) =>
         s.id === scene.id
           ? { ...s, thumb: stored.url, status: "ready" as const }
@@ -304,6 +421,7 @@ export const retryRenderScene = createServerFn({ method: "POST" })
         .update({
           status: "done",
           asset_id: stored.id,
+          model: stored.model,
           finished_at: new Date().toISOString(),
         })
         .eq("id", out.id as string);
@@ -438,7 +556,11 @@ async function callPikaTool(
 async function pollPikaTask(
   tools: Record<string, unknown>,
   taskId: string,
-  opts: { timeoutMs: number; intervalMs: number },
+  opts: {
+    timeoutMs: number;
+    intervalMs: number;
+    sweep?: (out: unknown) => string[];
+  },
 ): Promise<string[]> {
   const status = tools["task_status"] as
     | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
@@ -448,11 +570,12 @@ async function pollPikaTask(
   const args: Record<string, unknown> = {};
   setFirst(args, keys, ["taskId", "task_id", "id", "jobId", "job_id"], taskId);
 
+  const sweep = opts.sweep ?? sweepCandidateVideoUrls;
   const deadline = Date.now() + opts.timeoutMs;
   let lastOut: unknown = null;
   while (Date.now() < deadline) {
     lastOut = await status.execute(args, {});
-    const urls = sweepCandidateVideoUrls(lastOut);
+    const urls = sweep(lastOut);
     if (urls.length) return urls;
     const txt = JSON.stringify(lastOut ?? {}).toLowerCase();
     if (/("?status"?\s*:\s*"?(failed|error|cancell?ed))/i.test(txt)) {

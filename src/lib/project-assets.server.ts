@@ -141,3 +141,39 @@ export function sweepCandidateVideoUrls(out: unknown): string[] {
   visit(out);
   return Array.from(urls);
 }
+
+// Same shape as sweepCandidateVideoUrls but for image assets returned by
+// Pika MCP (generate_image etc.). Accepts http(s) URLs whose path has an
+// image-ish extension or whose host hints at a Pika/CDN bucket.
+export function sweepCandidateImageUrls(out: unknown): string[] {
+  const urls = new Set<string>();
+  const visit = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const matches = v.match(/https?:\/\/[^\s"'<>)]+/g);
+      if (matches) {
+        for (const u of matches) {
+          if (
+            /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(u) ||
+            /(pika|image|img|cdn|s3|r2|storage)/i.test(u)
+          ) {
+            // Filter out obvious non-image hits (videos) — we want images only.
+            if (!/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) {
+              urls.add(u);
+            }
+          }
+        }
+      }
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach(visit);
+      return;
+    }
+    if (typeof v === "object") {
+      for (const val of Object.values(v as Record<string, unknown>)) visit(val);
+    }
+  };
+  visit(out);
+  return Array.from(urls);
+}
