@@ -1078,8 +1078,8 @@ function StatusDot({ status }: { status: Scene["status"] }) {
         : "bg-muted-foreground/60";
   const label = status === "ready" ? "Ready" : status === "rendering" ? "Rendering" : "Draft";
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] backdrop-blur">
-      <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
+    <span className="inline-flex items-start gap-1 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] leading-none backdrop-blur">
+      <span className={`mt-[3px] h-1.5 w-1.5 rounded-full ${color}`} />
       {label}
     </span>
   );
