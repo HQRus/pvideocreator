@@ -3,6 +3,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import symbolLogo from "@/assets/symbol.svg";
+import { fetchWithAuth, buildAuthHeaders } from "@/lib/fetch-with-auth";
 import {
   Play,
   Pause,
@@ -57,7 +58,7 @@ import {
   type ProjectState,
   type Scene,
 } from "@/lib/project-state";
-export const Route = createFileRoute("/studio")({
+export const Route = createFileRoute("/_authenticated/studio")({
   component: Studio,
 });
 
@@ -70,7 +71,7 @@ function Studio() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch("/api/pika/status");
+        const r = await fetchWithAuth("/api/pika/status");
         const j = (await r.json()) as { state?: string };
         if (cancelled) return;
         if (j.state === "ready") setGate("ready");
@@ -391,7 +392,10 @@ function ChatPanel({
 }) {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      headers: () => buildAuthHeaders(),
+    }),
   });
 
   const busy = status === "submitted" || status === "streaming";

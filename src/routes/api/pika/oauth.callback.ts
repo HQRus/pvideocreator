@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { callbackUrlFromRequest, completeOAuth } from "@/lib/pika-mcp.server";
+import {
+  callbackUrlFromRequest,
+  completeOAuth,
+  findUserIdByOAuthState,
+} from "@/lib/pika-mcp.server";
 
 function html(body: string, status = 200) {
   return new Response(
@@ -23,8 +27,13 @@ export const Route = createFileRoute("/api/pika/oauth/callback")({
         const error = url.searchParams.get("error");
         if (error) return html(`<h1>Pika sign-in failed</h1><p>${error}</p>`, 400);
         if (!code) return html("<h1>Missing code</h1>", 400);
+        if (!state) return html("<h1>Missing state</h1>", 400);
         try {
-          await completeOAuth(code, state, callbackUrlFromRequest(request));
+          const userId = await findUserIdByOAuthState(state);
+          if (!userId) {
+            return html("<h1>Unknown OAuth state</h1><p>Please retry the connection.</p>", 400);
+          }
+          await completeOAuth(userId, code, state, callbackUrlFromRequest(request));
           return html("<h1>Pika connected ✓</h1><p>You can close this tab.</p>");
         } catch (err) {
           console.error("[pika/callback]", err);

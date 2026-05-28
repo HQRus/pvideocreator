@@ -1,5 +1,6 @@
 // Server-only: Pika MCP client + OAuth provider.
-// Persists a single shared connection in `public.pika_connections` (id='singleton').
+// Persists one Pika OAuth connection per app user in
+// `public.pika_connections`, keyed by `user_id`.
 
 import { auth as mcpAuth, createMCPClient } from "@ai-sdk/mcp";
 import type {
@@ -11,10 +12,10 @@ import type {
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const PIKA_MCP_URL = "https://mcp.pika.me/api/mcp";
-const ROW_ID = "singleton";
 
 type PikaRow = {
   id: string;
+  user_id: string;
   server_url: string;
   client_information: OAuthClientInformation | null;
   code_verifier: string | null;
@@ -23,11 +24,11 @@ type PikaRow = {
   expires_at: string | null;
 };
 
-async function loadRow(): Promise<PikaRow | null> {
+async function loadRow(userId: string): Promise<PikaRow | null> {
   const { data, error } = await supabaseAdmin
     .from("pika_connections" as never)
     .select("*")
-    .eq("id", ROW_ID)
+    .eq("user_id", userId)
     .maybeSingle();
   if (error) {
     console.error("[pika] loadRow error:", error);
@@ -36,24 +37,37 @@ async function loadRow(): Promise<PikaRow | null> {
   return (data as PikaRow | null) ?? null;
 }
 
-async function upsertRow(patch: Partial<PikaRow>): Promise<void> {
-  const row = {
-    id: ROW_ID,
-    server_url: PIKA_MCP_URL,
-    ...patch,
-    updated_at: new Date().toISOString(),
-  };
+async function upsertRow(
+  userId: string,
+  patch: Partial<PikaRow>,
+): Promise<void> {
+  const existing = await loadRow(userId);
+  if (existing) {
+    const { error } = await supabaseAdmin
+      .from("pika_connections" as never)
+      .update({
+        ...patch,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("user_id", userId);
+    if (error) console.error("[pika] update error:", error);
+    return;
+  }
   const { error } = await supabaseAdmin
     .from("pika_connections" as never)
-    .upsert(row as never, { onConflict: "id" });
-  if (error) console.error("[pika] upsertRow error:", error);
+    .insert({
+      user_id: userId,
+      server_url: PIKA_MCP_URL,
+      ...patch,
+    } as never);
+  if (error) console.error("[pika] insert error:", error);
 }
 
-export async function deleteConnection(): Promise<void> {
+export async function deleteConnection(userId: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from("pika_connections" as never)
     .delete()
-    .eq("id", ROW_ID);
+    .eq("user_id", userId);
   if (error) console.error("[pika] delete error:", error);
 }
 
@@ -71,7 +85,11 @@ function buildClientMetadata(redirectUri: string): OAuthClientMetadata {
 // In-memory captured redirect URL (used during connect-time flow).
 type Capture = { authUrl?: string };
 
-function makeProvider(redirectUri: string, capture: Capture): OAuthClientProvider {
+function makeProvider(
+  userId: string,
+  redirectUri: string,
+  capture: Capture,
+): OAuthClientProvider {
   return {
     get redirectUrl() {
       return redirectUri;
@@ -80,45 +98,45 @@ function makeProvider(redirectUri: string, capture: Capture): OAuthClientProvide
       return buildClientMetadata(redirectUri);
     },
     async tokens() {
-      const row = await loadRow();
+      const row = await loadRow(userId);
       return row?.tokens ?? undefined;
     },
     async saveTokens(tokens) {
       const expiresAt = tokens.expires_in
         ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
         : null;
-      await upsertRow({ tokens, expires_at: expiresAt });
+      await upsertRow(userId, { tokens, expires_at: expiresAt });
     },
     async redirectToAuthorization(url) {
       capture.authUrl = url.toString();
     },
     async saveCodeVerifier(v) {
-      await upsertRow({ code_verifier: v });
+      await upsertRow(userId, { code_verifier: v });
     },
     async codeVerifier() {
-      const row = await loadRow();
+      const row = await loadRow(userId);
       if (!row?.code_verifier) throw new Error("Missing code verifier");
       return row.code_verifier;
     },
     async clientInformation() {
-      const row = await loadRow();
+      const row = await loadRow(userId);
       return row?.client_information ?? undefined;
     },
     async saveClientInformation(info) {
-      await upsertRow({ client_information: info });
+      await upsertRow(userId, { client_information: info });
     },
     async saveState(state) {
-      await upsertRow({ oauth_state: state });
+      await upsertRow(userId, { oauth_state: state });
     },
     async storedState() {
-      const row = await loadRow();
+      const row = await loadRow(userId);
       return row?.oauth_state ?? undefined;
     },
     async invalidateCredentials(scope) {
-      if (scope === "all") await deleteConnection();
-      else if (scope === "tokens") await upsertRow({ tokens: null, expires_at: null });
-      else if (scope === "verifier") await upsertRow({ code_verifier: null });
-      else if (scope === "client") await upsertRow({ client_information: null });
+      if (scope === "all") await deleteConnection(userId);
+      else if (scope === "tokens") await upsertRow(userId, { tokens: null, expires_at: null });
+      else if (scope === "verifier") await upsertRow(userId, { code_verifier: null });
+      else if (scope === "client") await upsertRow(userId, { client_information: null });
     },
   };
 }
@@ -164,9 +182,10 @@ export function callbackUrlFromRequest(req: Request): string {
  *   { state: 'authenticating', authUrl } — user must visit the URL
  */
 export async function beginConnect(
+  userId: string,
   redirectUri: string,
 ): Promise<{ state: "ready" } | { state: "authenticating"; authUrl: string }> {
-  const existing = await loadRow();
+  const existing = await loadRow(userId);
   const registeredRedirects = Array.isArray(
     (existing?.client_information as { redirect_uris?: unknown } | null)?.redirect_uris,
   )
@@ -178,7 +197,7 @@ export async function beginConnect(
 
   // Reset any stale flow artifacts but keep client_information so we don't
   // re-register on every retry.
-  await upsertRow({
+  await upsertRow(userId, {
     server_url: PIKA_MCP_URL,
     code_verifier: null,
     oauth_state: null,
@@ -186,7 +205,7 @@ export async function beginConnect(
   });
 
   const capture: Capture = {};
-  const provider = makeProvider(redirectUri, capture);
+  const provider = makeProvider(userId, redirectUri, capture);
 
   // Kick the OAuth state machine. Without authorizationCode this triggers
   // discovery + dynamic client registration + redirectToAuthorization.
@@ -200,12 +219,13 @@ export async function beginConnect(
 }
 
 export async function completeOAuth(
+  userId: string,
   code: string,
   state: string | undefined,
   redirectUri: string,
 ): Promise<void> {
   const capture: Capture = {};
-  const provider = makeProvider(redirectUri, capture);
+  const provider = makeProvider(userId, redirectUri, capture);
   const result = await mcpAuth(provider, {
     serverUrl: PIKA_MCP_URL,
     authorizationCode: code,
@@ -216,18 +236,38 @@ export async function completeOAuth(
   }
 }
 
-export async function getStatus(): Promise<"ready" | "disconnected"> {
-  const row = await loadRow();
+export async function getStatus(userId: string): Promise<"ready" | "disconnected"> {
+  const row = await loadRow(userId);
   return row?.tokens?.access_token ? "ready" : "disconnected";
+}
+
+/**
+ * The Pika OAuth callback redirects into a new browser tab/window that does
+ * NOT share the app's Supabase session (the SDK persists to localStorage,
+ * not cookies). To still associate the callback with the right user, we
+ * look the user up by the `state` value we previously stored in their
+ * pika_connections row.
+ */
+export async function findUserIdByOAuthState(state: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("pika_connections" as never)
+    .select("user_id")
+    .eq("oauth_state", state)
+    .maybeSingle();
+  if (error) {
+    console.error("[pika] findUserIdByOAuthState error:", error);
+    return null;
+  }
+  return ((data as { user_id?: string } | null)?.user_id) ?? null;
 }
 
 /**
  * Open a short-lived MCP client for the lifetime of one chat turn.
  * Caller is responsible for closing it.
  */
-export async function openPikaMCPClient(redirectUri: string) {
+export async function openPikaMCPClient(userId: string, redirectUri: string) {
   const capture: Capture = {};
-  const provider = makeProvider(redirectUri, capture);
+  const provider = makeProvider(userId, redirectUri, capture);
   return createMCPClient({
     transport: {
       type: "http",
