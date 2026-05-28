@@ -357,19 +357,77 @@ function FloatingGallery({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
+            {collapsedPreview.length === 0 && (
+              <ProjectAvatar
+                title={currentTitle}
+                thumbnailUrl={null}
+                isCurrent
+                size={48}
+              />
+            )}
+            {collapsedPreview.map((p) => {
+              const isCurrent = p.id === currentProjectId;
+              return (
+                <ProjectAvatar
+                  key={p.id}
+                  title={isCurrent ? currentTitle : p.title}
+                  thumbnailUrl={p.thumbnailUrl}
+                  isCurrent={isCurrent}
+                  size={48}
+                />
+              );
+            })}
             <div
-              title={currentTitle}
-              className="grid h-12 w-12 place-items-center rounded-xl bg-brand-gradient text-primary-foreground"
+              onClick={(e) => {
+                e.stopPropagation();
+                void onNew(e);
+              }}
+              className="mt-1 grid h-12 w-12 cursor-pointer place-items-center rounded-full border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              title="New project"
             >
-              <Film className="h-4 w-4" />
-            </div>
-            <div className="mt-1 grid h-12 w-12 place-items-center rounded-xl border border-dashed border-border text-muted-foreground">
               <Plus className="h-4 w-4" />
             </div>
           </div>
         )}
       </div>
     </aside>
+  );
+}
+
+function ProjectAvatar({
+  title,
+  thumbnailUrl,
+  isCurrent,
+  size,
+}: {
+  title: string;
+  thumbnailUrl: string | null;
+  isCurrent: boolean;
+  size: number;
+}) {
+  const initial = (title || "?").trim().charAt(0).toUpperCase() || "?";
+  const ring = isCurrent
+    ? "ring-2 ring-primary ring-offset-2 ring-offset-card opacity-100"
+    : "ring-1 ring-border opacity-50 grayscale";
+  return (
+    <div
+      style={{ width: size, height: size }}
+      className={`relative shrink-0 overflow-hidden rounded-full bg-brand-gradient text-primary-foreground transition ${ring}`}
+      title={title}
+    >
+      {thumbnailUrl ? (
+        <img
+          src={thumbnailUrl}
+          alt={title}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="grid h-full w-full place-items-center font-display text-base font-semibold">
+          {initial}
+        </div>
+      )}
+    </div>
   );
 }
 
