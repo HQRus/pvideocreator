@@ -1262,14 +1262,20 @@ function StructurePanel({
             {cast.length === 0 && (
               <EmptyHint icon={<Users className="h-8 w-8" />} text="No cast yet — ask the director to suggest characters." />
             )}
-            {cast.map((c) => (
+            {cast.map((c) => {
+              // c.ref is an asset id (ast_xxx) — resolve it against the
+              // project's assets list so the uploaded selfie/likeness shows.
+              const refUrl =
+                (c.ref && assets.find((a) => a.id === c.ref)?.url) ||
+                (c.ref && /^https?:|^blob:|^\//.test(c.ref) ? c.ref : "");
+              return (
               <div
                 key={c.id}
                 className="flex gap-5 rounded-2xl border border-border/60 bg-card/40 p-5"
               >
-                {c.ref ? (
+                {refUrl ? (
                   <img
-                    src={c.ref}
+                    src={refUrl}
                     alt={c.name}
                     className="h-20 w-20 shrink-0 rounded-2xl object-cover"
                   />
@@ -1290,7 +1296,8 @@ function StructurePanel({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
             <button className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card/30 py-5 text-base font-semibold text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground">
               <ImagePlus className="h-5 w-5" /> Add character / reference
             </button>
