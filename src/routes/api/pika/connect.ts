@@ -17,6 +17,12 @@ export const Route = createFileRoute("/api/pika/connect")({
             "Set-Cookie",
             `pika_oauth_uid=${encodeURIComponent(userId)}; Path=/api/pika; Max-Age=900; SameSite=Lax; Secure; HttpOnly`,
           );
+          if (result.state === "authenticating" && result.oauthState) {
+            res.headers.append(
+              "Set-Cookie",
+              `pika_oauth_state=${encodeURIComponent(result.oauthState)}; Path=/api/pika; Max-Age=900; SameSite=Lax; Secure; HttpOnly`,
+            );
+          }
           return res;
         } catch (err) {
           if (err instanceof Error && /Unauthorized/.test(err.message)) {
