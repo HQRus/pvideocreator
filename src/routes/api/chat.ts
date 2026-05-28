@@ -10,6 +10,11 @@ import {
 import { z } from "zod";
 import { putAsset, base64ToBytes } from "@/lib/asset-cache.server";
 import {
+  storeAsset,
+  downloadAndStoreUrl,
+  sweepCandidateVideoUrls,
+} from "@/lib/project-assets.server";
+import {
   callbackUrlFromRequest,
   getStatus,
   openPikaMCPClient,
@@ -25,25 +30,7 @@ const nextToolAssetId = () =>
   `ast_t${Date.now().toString(36)}${(++_toolAssetCounter).toString(36)}`;
 
 // Walk an arbitrary value for video-ish URLs (used to summarize Pika output in logs).
-function sweepVideoUrls(out: unknown): string[] {
-  const urls = new Set<string>();
-  const visit = (v: unknown) => {
-    if (!v) return;
-    if (typeof v === "string") {
-      const matches = v.match(/https?:\/\/[^\s"'<>)]+/g);
-      if (matches) for (const u of matches) {
-        if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) urls.add(u);
-      }
-      return;
-    }
-    if (Array.isArray(v)) { v.forEach(visit); return; }
-    if (typeof v === "object") {
-      for (const val of Object.values(v as Record<string, unknown>)) visit(val);
-    }
-  };
-  visit(out);
-  return Array.from(urls);
-}
+const sweepVideoUrls = sweepCandidateVideoUrls;
 
 async function gatewayGenerateImage(
   prompt: string,
@@ -530,19 +517,41 @@ export const Route = createFileRoute("/api/chat")({
             execute: async ({ prompt, kind, label }) => {
               try {
                 const { b64, mime } = await gatewayGenerateImage(prompt, key);
-                const id = nextToolAssetId();
-                // Stash bytes server-side; only stream a short URL through
-                // the model context (base64 in tool results blows past the
-                // token limit on the next step).
-                putAsset(id, mime, base64ToBytes(b64));
-                return {
-                  id,
-                  kind: kind ?? "reference",
-                  mime,
-                  name: (label ?? prompt.slice(0, 40)) + ".png",
-                  url: `/api/asset/${id}`,
-                  label,
-                };
+                const bytes = base64ToBytes(b64);
+                // Persist durably so the asset survives page reload.
+                try {
+                  const stored = await storeAsset({
+                    projectId,
+                    userId,
+                    kind: kind ?? "reference",
+                    mime,
+                    bytes,
+                    label,
+                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                  });
+                  return {
+                    id: stored.id,
+                    kind: kind ?? "reference",
+                    mime,
+                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                    url: stored.url,
+                    label,
+                  };
+                } catch (e) {
+                  // Fall back to in-memory cache so the current turn still
+                  // works even if storage upload fails.
+                  console.error("[chat] storeAsset failed, falling back:", e);
+                  const id = nextToolAssetId();
+                  putAsset(id, mime, bytes);
+                  return {
+                    id,
+                    kind: kind ?? "reference",
+                    mime,
+                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                    url: `/api/asset/${id}`,
+                    label,
+                  };
+                }
               } catch (err) {
                 return {
                   error: err instanceof Error ? err.message : String(err),
@@ -670,6 +679,38 @@ export const Route = createFileRoute("/api/chat")({
                     },
                     { onConflict: "id" },
                   );
+                // Persist pika clip URLs durably so they don't 404 later.
+                try {
+                  const toolParts = (lastAssistant.parts as Array<{
+                    type: string;
+                    state?: string;
+                    output?: unknown;
+                  }>).filter(
+                    (p) =>
+                      typeof p.type === "string" &&
+                      p.type.startsWith("tool-pika_") &&
+                      p.state === "output-available",
+                  );
+                  for (const p of toolParts) {
+                    const urls = sweepVideoUrls(p.output);
+                    for (const u of urls) {
+                      try {
+                        await downloadAndStoreUrl({
+                          projectId,
+                          userId,
+                          sourceUrl: u,
+                          kind: "video",
+                          label: "Pika clip",
+                          fallbackMime: "video/mp4",
+                        });
+                      } catch (e) {
+                        console.error("[chat] pika clip persist failed:", e);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error("[chat] pika clip scan failed:", e);
+                }
                 // Apply embedded project patch (if any) to project_state.
                 const text = (lastAssistant.parts as Array<{ type: string; text?: string }>)
                   .filter((p) => p.type === "text")

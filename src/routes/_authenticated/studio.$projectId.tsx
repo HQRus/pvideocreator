@@ -12,6 +12,8 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
+import { startRender } from "@/lib/render.functions";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
   Pause,
@@ -126,6 +128,32 @@ function Studio() {
   const { scenes, cast, music, meta, assets } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
+  // Subscribe to live project_state updates pushed by the render pipeline,
+  // so scene thumbnails appear as keyframes finish.
+  useEffect(() => {
+    if (gate !== "ready" || !projectId) return;
+    const channel = supabase
+      .channel(`project-${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "projects",
+          filter: `id=eq.${projectId}`,
+        },
+        (payload) => {
+          const next = (payload.new as { project_state?: ProjectState })
+            ?.project_state;
+          if (next) setProject(next);
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [projectId, gate]);
+
   const handlePatch = (patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
     void updateState({ data: { id: projectId, patch } }).then(() => {
@@ -186,6 +214,7 @@ function Studio() {
       >
         <div className="h-full w-[440px]">
           <StructurePanel
+            projectId={projectId}
             meta={meta}
             scenes={scenes}
             setScenes={setScenes}
@@ -695,7 +724,9 @@ function ChatPanel({
             <BrandMark className="h-12 w-12" />
             <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
           </div>
-          {pikaCalls.length > 0 && (
+          {pikaCalls.length > 0 &&
+            typeof window !== "undefined" &&
+            window.localStorage?.getItem("avd:dev") === "1" && (
             <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card/50 p-3">
               <div className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Pika render activity
@@ -971,6 +1002,7 @@ function StatusDot({ status }: { status: Scene["status"] }) {
 // ---------- structure panel ----------
 
 function StructurePanel({
+  projectId,
   meta,
   scenes,
   setScenes,
@@ -981,6 +1013,7 @@ function StructurePanel({
   onSelect,
   totalDuration,
 }: {
+  projectId: string;
   meta: {
     title: string;
     format: string;
@@ -999,6 +1032,30 @@ function StructurePanel({
   onSelect: (id: string) => void;
   totalDuration: number;
 }) {
+  const startRenderFn = useServerFn(startRender);
+  const [rendering, setRendering] = useState(false);
+  const [renderMsg, setRenderMsg] = useState<string | null>(null);
+  const onRender = async () => {
+    if (rendering) return;
+    if (scenes.length === 0) {
+      setRenderMsg("Add at least one scene first.");
+      return;
+    }
+    setRendering(true);
+    setRenderMsg("Generating keyframes…");
+    try {
+      const r = await startRenderFn({ data: { projectId } });
+      setRenderMsg(
+        r.failCount === 0
+          ? `Rendered ${r.okCount} keyframe${r.okCount === 1 ? "" : "s"}.`
+          : `${r.okCount} ok, ${r.failCount} failed.`,
+      );
+    } catch (e) {
+      setRenderMsg(e instanceof Error ? e.message : "Render failed.");
+    } finally {
+      setRendering(false);
+    }
+  };
   return (
     <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
@@ -1170,10 +1227,19 @@ function StructurePanel({
           <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-base font-bold tracking-tight text-foreground transition hover:bg-muted">
             Export
           </button>
-          <button className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95">
-            Render
+          <button
+            onClick={onRender}
+            disabled={rendering}
+            className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
+          >
+            {rendering ? "Rendering…" : "Render"}
           </button>
         </div>
+        {renderMsg && (
+          <div className="pointer-events-auto mt-2 text-center text-xs text-muted-foreground">
+            {renderMsg}
+          </div>
+        )}
       </div>
     </div>
   );
