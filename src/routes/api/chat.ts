@@ -477,6 +477,7 @@ type ChatRequestBody = { messages?: unknown; projectId?: unknown };
 
 const SAFE_PIKA_TOOL_NAMES = new Set([
   "upload_asset",
+  "generate_image",
   "generate_video",
   "generate_reference_video",
   "generate_keyframes_video",
