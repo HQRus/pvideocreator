@@ -488,6 +488,7 @@ function ChatPanel({
                 key={it.key}
                 title={it.title}
                 answer={it.answer}
+                assets={assets}
                 onRevise={() =>
                   handleSend(`Let's revise "${it.title}" — show me that card again.`)
                 }
