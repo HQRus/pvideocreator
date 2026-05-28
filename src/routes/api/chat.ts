@@ -431,6 +431,16 @@ them by id.
 
 type ChatRequestBody = { messages?: unknown; projectId?: unknown };
 
+const SAFE_PIKA_TOOL_NAMES = new Set([
+  "upload_asset",
+  "generate_video",
+  "generate_reference_video",
+  "generate_keyframes_video",
+  "task_status",
+  "task_cancel",
+  "analyze_media",
+]);
+
 function extractPatchFromText(text: string): unknown | null {
   const m = text.match(
     /<script[^>]*data-project-patch[^>]*>([\s\S]*?)<\/script>/i,
@@ -603,6 +613,9 @@ export const Route = createFileRoute("/api/chat")({
             pikaClient = await openPikaMCPClient(userId, redirectUri);
             const pikaTools = await pikaClient.tools();
             for (const [name, t] of Object.entries(pikaTools)) {
+              if (!SAFE_PIKA_TOOL_NAMES.has(name)) {
+                continue;
+              }
               const key = `pika_${name}`;
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const original = t as any;
