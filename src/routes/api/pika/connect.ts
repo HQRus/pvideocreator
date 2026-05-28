@@ -10,7 +10,14 @@ export const Route = createFileRoute("/api/pika/connect")({
           const { userId } = await requireUser(request);
           const redirectUri = callbackUrlFromRequest(request);
           const result = await beginConnect(userId, redirectUri);
-          return Response.json(result);
+          // Set a short-lived cookie so the OAuth callback (which opens in a
+          // new tab without our bearer token) can still identify the user.
+          const res = Response.json(result);
+          res.headers.append(
+            "Set-Cookie",
+            `pika_oauth_uid=${encodeURIComponent(userId)}; Path=/api/pika; Max-Age=900; SameSite=Lax; Secure; HttpOnly`,
+          );
+          return res;
         } catch (err) {
           if (err instanceof Error && /Unauthorized/.test(err.message)) {
             return unauthorizedResponse(err.message);
