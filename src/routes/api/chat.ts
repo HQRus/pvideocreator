@@ -387,6 +387,14 @@ The Project panel must never sit empty after the user has given a concept.
   setting cast[i].ref = "ast_xxx". Then weave that character's appearance
   (described from the upload) into every scene.prompt where they appear, so
   later keyframe generation can stay visually consistent.
+- Uploaded assets in user messages also include a "url=https://..." which
+  is the durable signed URL for that file. When you call generate_image,
+  pika_*, or any external tool that needs the actual image (e.g. for a
+  character likeness reference), pass that EXACT url through — do NOT
+  invent a URL from the asset id, do NOT use the bare [ast_xxx] token, and
+  do NOT skip the reference just because direct fetches failed once. If a
+  tool says it can't reach the link, retry with the same url before
+  falling back to a text-only description.
 - When the user approves the storyboard (or asks for keyframes), call
   generate_image once per scene with a vivid prompt that bakes in the
   logline + scene.prompt + character description + a consistent style note.
