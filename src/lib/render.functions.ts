@@ -517,7 +517,11 @@ async function callPikaTool(
 async function pollPikaTask(
   tools: Record<string, unknown>,
   taskId: string,
-  opts: { timeoutMs: number; intervalMs: number },
+  opts: {
+    timeoutMs: number;
+    intervalMs: number;
+    sweep?: (out: unknown) => string[];
+  },
 ): Promise<string[]> {
   const status = tools["task_status"] as
     | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
@@ -527,11 +531,12 @@ async function pollPikaTask(
   const args: Record<string, unknown> = {};
   setFirst(args, keys, ["taskId", "task_id", "id", "jobId", "job_id"], taskId);
 
+  const sweep = opts.sweep ?? sweepCandidateVideoUrls;
   const deadline = Date.now() + opts.timeoutMs;
   let lastOut: unknown = null;
   while (Date.now() < deadline) {
     lastOut = await status.execute(args, {});
-    const urls = sweepCandidateVideoUrls(lastOut);
+    const urls = sweep(lastOut);
     if (urls.length) return urls;
     const txt = JSON.stringify(lastOut ?? {}).toLowerCase();
     if (/("?status"?\s*:\s*"?(failed|error|cancell?ed))/i.test(txt)) {
