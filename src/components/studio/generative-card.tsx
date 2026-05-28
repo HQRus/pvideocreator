@@ -51,7 +51,7 @@ const SANITIZE_CONFIG = {
 
 export function extractCardTitle(html: string): string {
   const m = html.match(/data-card-title=["']([^"']+)["']/);
-  return m ? m[1] : "Card";
+  return m ? m[1] : "";
 }
 
 // Pulls the conversational AI prose out of the card so it can be rendered
