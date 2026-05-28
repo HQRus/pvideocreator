@@ -21,6 +21,27 @@ let _toolAssetCounter = 0;
 const nextToolAssetId = () =>
   `ast_t${Date.now().toString(36)}${(++_toolAssetCounter).toString(36)}`;
 
+// Walk an arbitrary value for video-ish URLs (used to summarize Pika output in logs).
+function sweepVideoUrls(out: unknown): string[] {
+  const urls = new Set<string>();
+  const visit = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const matches = v.match(/https?:\/\/[^\s"'<>)]+/g);
+      if (matches) for (const u of matches) {
+        if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) urls.add(u);
+      }
+      return;
+    }
+    if (Array.isArray(v)) { v.forEach(visit); return; }
+    if (typeof v === "object") {
+      for (const val of Object.values(v as Record<string, unknown>)) visit(val);
+    }
+  };
+  visit(out);
+  return Array.from(urls);
+}
+
 async function gatewayGenerateImage(
   prompt: string,
   apiKey: string,
@@ -507,7 +528,37 @@ export const Route = createFileRoute("/api/chat")({
             pikaClient = await openPikaMCPClient(redirectUri);
             const pikaTools = await pikaClient.tools();
             for (const [name, t] of Object.entries(pikaTools)) {
-              tools[`pika_${name}`] = t;
+              const key = `pika_${name}`;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const original = t as any;
+              const origExec: ((args: unknown, ctx: unknown) => unknown) | undefined =
+                typeof original.execute === "function"
+                  ? original.execute.bind(original)
+                  : undefined;
+              tools[key] = origExec
+                ? {
+                    ...original,
+                    execute: async (args: unknown, ctx: unknown) => {
+                      const start = Date.now();
+                      const argSummary = JSON.stringify(args).slice(0, 400);
+                      console.log(`[pika] -> ${key} args=${argSummary}`);
+                      try {
+                        const out = await origExec(args, ctx);
+                        const urls = sweepVideoUrls(out);
+                        const ms = Date.now() - start;
+                        const outSummary = JSON.stringify(out).slice(0, 500);
+                        console.log(
+                          `[pika] <- ${key} ${ms}ms videos=${urls.length}${urls.length ? " " + urls.join(",") : ""} out=${outSummary}`,
+                        );
+                        return out;
+                      } catch (err) {
+                        const ms = Date.now() - start;
+                        console.error(`[pika] !! ${key} ${ms}ms threw`, err);
+                        throw err;
+                      }
+                    },
+                  }
+                : t;
             }
           }
         } catch (err) {
