@@ -1000,6 +1000,7 @@ function StatusDot({ status }: { status: Scene["status"] }) {
 // ---------- structure panel ----------
 
 function StructurePanel({
+  projectId,
   meta,
   scenes,
   setScenes,
@@ -1010,6 +1011,7 @@ function StructurePanel({
   onSelect,
   totalDuration,
 }: {
+  projectId: string;
   meta: {
     title: string;
     format: string;
@@ -1028,6 +1030,30 @@ function StructurePanel({
   onSelect: (id: string) => void;
   totalDuration: number;
 }) {
+  const startRenderFn = useServerFn(startRender);
+  const [rendering, setRendering] = useState(false);
+  const [renderMsg, setRenderMsg] = useState<string | null>(null);
+  const onRender = async () => {
+    if (rendering) return;
+    if (scenes.length === 0) {
+      setRenderMsg("Add at least one scene first.");
+      return;
+    }
+    setRendering(true);
+    setRenderMsg("Generating keyframes…");
+    try {
+      const r = await startRenderFn({ data: { projectId } });
+      setRenderMsg(
+        r.failCount === 0
+          ? `Rendered ${r.okCount} keyframe${r.okCount === 1 ? "" : "s"}.`
+          : `${r.okCount} ok, ${r.failCount} failed.`,
+      );
+    } catch (e) {
+      setRenderMsg(e instanceof Error ? e.message : "Render failed.");
+    } finally {
+      setRendering(false);
+    }
+  };
   return (
     <div className="relative flex h-full flex-col">
       <Tabs defaultValue="storyboard" className="flex h-full flex-col">
