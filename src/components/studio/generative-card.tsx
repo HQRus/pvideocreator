@@ -505,11 +505,30 @@ export function DecisionPill({
   title,
   answer,
   onRevise,
+  assets,
 }: {
   title: string;
   answer: string;
   onRevise?: () => void;
+  assets?: ProjectAsset[];
 }) {
+  const ids = Array.from(answer.matchAll(/\[(ast_[a-z0-9]+)\]/gi)).map((m) => m[1]);
+  const byId = new Map((assets ?? []).map((a) => [a.id, a]));
+  const refs = ids.map((id) => byId.get(id)).filter(Boolean) as ProjectAsset[];
+  const images = refs.filter((a) => a.mime.startsWith("image/"));
+  const others = refs.filter((a) => !a.mime.startsWith("image/"));
+
+  const cleaned = answer
+    .replace(
+      /(?:^|\s|·|;)\s*(?:[a-z /]+):\s*[^;·\n]*?\[ast_[a-z0-9]+\]/gi,
+      "",
+    )
+    .replace(/\[ast_[a-z0-9]+\]/gi, "")
+    .replace(/^\s*attached\s*[—-]\s*/i, "")
+    .replace(/\s*·\s*·\s*/g, " · ")
+    .replace(/^[\s·;,-]+|[\s·;,-]+$/g, "")
+    .trim();
+
   return (
     <button
       type="button"
@@ -521,7 +540,32 @@ export function DecisionPill({
       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </span>
-      <span className="text-base leading-snug">{answer}</span>
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {images.map((a) => (
+            <img
+              key={a.id}
+              src={a.url}
+              alt={a.name}
+              className="max-h-64 max-w-full rounded-2xl object-cover"
+            />
+          ))}
+        </div>
+      )}
+      {others.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {others.map((a) => (
+            <div
+              key={a.id}
+              className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground"
+            >
+              {a.mime.startsWith("audio/") ? "♪ " : a.mime.startsWith("video/") ? "▶ " : "• "}
+              {a.name}
+            </div>
+          ))}
+        </div>
+      )}
+      {cleaned && <span className="text-base leading-snug">{cleaned}</span>}
     </button>
   );
 }
