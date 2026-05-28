@@ -12,6 +12,8 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
+import { startRender } from "@/lib/render.functions";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
   Pause,
@@ -126,6 +128,32 @@ function Studio() {
   const { scenes, cast, music, meta, assets } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
+  // Subscribe to live project_state updates pushed by the render pipeline,
+  // so scene thumbnails appear as keyframes finish.
+  useEffect(() => {
+    if (gate !== "ready" || !projectId) return;
+    const channel = supabase
+      .channel(`project-${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "projects",
+          filter: `id=eq.${projectId}`,
+        },
+        (payload) => {
+          const next = (payload.new as { project_state?: ProjectState })
+            ?.project_state;
+          if (next) setProject(next);
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [projectId, gate]);
+
   const handlePatch = (patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
     void updateState({ data: { id: projectId, patch } }).then(() => {
@@ -186,6 +214,7 @@ function Studio() {
       >
         <div className="h-full w-[440px]">
           <StructurePanel
+            projectId={projectId}
             meta={meta}
             scenes={scenes}
             setScenes={setScenes}
