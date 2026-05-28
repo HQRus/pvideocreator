@@ -27,9 +27,16 @@ export const Route = createFileRoute("/api/pika/oauth/callback")({
         const error = url.searchParams.get("error");
         if (error) return html(`<h1>Pika sign-in failed</h1><p>${error}</p>`, 400);
         if (!code) return html("<h1>Missing code</h1>", 400);
-        if (!state) return html("<h1>Missing state</h1>", 400);
         try {
-          const userId = await findUserIdByOAuthState(state);
+          // Prefer the state-based lookup; fall back to the cookie set by
+          // /api/pika/connect for providers that don't echo back `state`.
+          let userId: string | null = null;
+          if (state) userId = await findUserIdByOAuthState(state);
+          if (!userId) {
+            const cookie = request.headers.get("cookie") ?? "";
+            const match = /(?:^|;\s*)pika_oauth_uid=([^;]+)/.exec(cookie);
+            if (match) userId = decodeURIComponent(match[1]);
+          }
           if (!userId) {
             return html("<h1>Unknown OAuth state</h1><p>Please retry the connection.</p>", 400);
           }
