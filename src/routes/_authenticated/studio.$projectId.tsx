@@ -329,13 +329,16 @@ function FloatingGallery({
                         params: { projectId: p.id },
                       });
                   }}
-                  className={`flex items-center gap-3 rounded-2xl p-2 text-left ${
-                    isCurrent ? "bg-muted/70" : "hover:bg-muted/40"
+                  className={`flex items-center gap-3 rounded-2xl p-2 text-left transition ${
+                    isCurrent ? "bg-muted/70" : "opacity-60 hover:opacity-100 hover:bg-muted/40"
                   }`}
                 >
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-brand-gradient text-primary-foreground">
-                    <Film className="h-5 w-5" />
-                  </div>
+                  <ProjectAvatar
+                    title={p.title}
+                    thumbnailUrl={p.thumbnailUrl}
+                    isCurrent={isCurrent}
+                    size={56}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{label}</div>
                     <div className="truncate text-xs text-muted-foreground">
