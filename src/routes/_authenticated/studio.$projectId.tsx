@@ -140,20 +140,37 @@ function Studio() {
       window.localStorage.setItem("studio:panelWidth", String(panelWidth));
     }
   }, [panelWidth]);
+  // During a drag we mutate refs + CSS variables directly so the whole
+  // Studio tree (chat, structure panel, timeline) doesn't re-render on
+  // every mousemove. State is only committed on mouseup.
+  const chatShellRef = useRef<HTMLDivElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const innerPanelRef = useRef<HTMLDivElement>(null);
   const startResize = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
     const startW = panelWidth;
+    let next = startW;
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      if (chatShellRef.current) chatShellRef.current.style.paddingRight = `${next + 32}px`;
+      if (asideRef.current) asideRef.current.style.width = `${next}px`;
+      if (innerPanelRef.current) innerPanelRef.current.style.width = `${next}px`;
+    };
     const onMove = (ev: MouseEvent) => {
       const maxW = Math.min(1200, window.innerWidth - 360);
-      const next = Math.max(320, Math.min(maxW, startW + (startX - ev.clientX)));
-      setPanelWidth(next);
+      next = Math.max(320, Math.min(maxW, startW + (startX - ev.clientX)));
+      if (!raf) raf = requestAnimationFrame(apply);
     };
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      if (raf) cancelAnimationFrame(raf);
+      // Commit final width once — triggers the single React re-render.
+      setPanelWidth(next);
     };
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
@@ -242,7 +259,8 @@ function Studio() {
     <div className="relative h-screen w-full overflow-hidden bg-background p-10 text-foreground">
       {/* Centered chat fills the screen; gallery & project panel float over it */}
       <div
-        className="absolute inset-0 flex flex-col transition-[padding] duration-200 ease-out"
+        ref={chatShellRef}
+        className="absolute inset-0 flex flex-col"
         style={{ paddingRight: panelOpen ? panelWidth + 32 : 0 }}
       >
         <StudioTopBar
@@ -268,6 +286,7 @@ function Studio() {
       <FloatingGallery currentProjectId={projectId} currentTitle={meta.title} />
 
       <aside
+        ref={asideRef}
         style={{ width: panelOpen ? panelWidth : 0 }}
         className={`pointer-events-auto absolute right-4 top-4 bottom-4 z-30 overflow-hidden rounded-3xl bg-card shadow-elegant ${
           panelOpen ? "opacity-100" : "opacity-0"
@@ -283,7 +302,7 @@ function Studio() {
             <div className="h-12 w-1 rounded-full bg-border transition group-hover:bg-primary" />
           </div>
         )}
-        <div className="h-full" style={{ width: panelWidth }}>
+        <div ref={innerPanelRef} className="h-full" style={{ width: panelWidth }}>
           <StructurePanel
             projectId={projectId}
             meta={meta}
