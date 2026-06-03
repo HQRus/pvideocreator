@@ -250,7 +250,24 @@ export function TimelinePanel({
             playsInline
           />
         ) : (
-          <PreviewPlaceholder scenes={scenes} playhead={playhead} />
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-muted-foreground">
+            {(() => {
+              // show keyframe at current playhead
+              let acc = 0;
+              const cur = scenes.find((s) => {
+                const end = acc + (s.duration || 0);
+                const hit = playhead >= acc && playhead < end;
+                acc = end;
+                return hit;
+              }) ?? scenes[0];
+              return cur?.thumb ? (
+                <img src={cur.thumb} alt={cur.title} className="max-h-[45vh] w-auto rounded-md" />
+              ) : (
+                <span className="text-sm">No preview yet — generate keyframes and clips.</span>
+              );
+            })()}
+            <span className="text-xs">Render clips to enable stitched playback.</span>
+          </div>
         )}
       </div>
 
