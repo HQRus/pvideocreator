@@ -128,6 +128,36 @@ function Studio() {
     INITIAL_PROJECT.scenes[0]?.id ?? "",
   );
   const [panelOpen, setPanelOpen] = useState(true);
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 440;
+    const saved = Number(window.localStorage.getItem("studio:panelWidth"));
+    return Number.isFinite(saved) && saved >= 320 && saved <= 1200 ? saved : 440;
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("studio:panelWidth", String(panelWidth));
+    }
+  }, [panelWidth]);
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      const maxW = Math.min(1200, window.innerWidth - 360);
+      const next = Math.max(320, Math.min(maxW, startW + (startX - ev.clientX)));
+      setPanelWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
   const { scenes, cast, music, meta, assets } = project;
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
@@ -217,7 +247,10 @@ function Studio() {
           panelOpen={panelOpen}
           onTogglePanel={() => setPanelOpen((o) => !o)}
         />
-        <div className="min-h-0 flex-1">
+        <div
+          className="min-h-0 flex-1 transition-[padding] duration-200 ease-out"
+          style={{ paddingRight: panelOpen ? panelWidth + 32 : 0 }}
+        >
           <ChatPanel
             projectId={projectId}
             initialMessages={initialMessages}
@@ -233,11 +266,22 @@ function Studio() {
       <FloatingGallery currentProjectId={projectId} currentTitle={meta.title} />
 
       <aside
-        className={`pointer-events-auto absolute right-4 top-4 bottom-4 z-30 overflow-hidden rounded-3xl bg-card shadow-elegant transition-[width,opacity] duration-300 ease-out ${
-          panelOpen ? "w-[440px] opacity-100" : "w-0 opacity-0"
+        style={{ width: panelOpen ? panelWidth : 0 }}
+        className={`pointer-events-auto absolute right-4 top-4 bottom-4 z-30 overflow-hidden rounded-3xl bg-card shadow-elegant ${
+          panelOpen ? "opacity-100" : "opacity-0"
         }`}
       >
-        <div className="h-full w-[440px]">
+        {panelOpen && (
+          <div
+            onMouseDown={startResize}
+            className="group absolute left-0 top-0 z-40 flex h-full w-2 cursor-col-resize items-center justify-center hover:bg-primary/10"
+            aria-label="Resize panel"
+            role="separator"
+          >
+            <div className="h-12 w-1 rounded-full bg-border transition group-hover:bg-primary" />
+          </div>
+        )}
+        <div className="h-full" style={{ width: panelWidth }}>
           <StructurePanel
             projectId={projectId}
             meta={meta}
