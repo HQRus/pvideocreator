@@ -831,22 +831,10 @@ export const Route = createFileRoute("/api/chat")({
 
         const result = streamText({
           model,
-          system: SYSTEM_PROMPT,
+          system: `${SYSTEM_PROMPT}\n\n${buildProjectStateContext(projectState)}`,
           tools: tools as never,
           stopWhen: stepCountIs(50) as never,
-          messages: await convertToModelMessages([
-            {
-              id: `project-state-${projectId}`,
-              role: "system",
-              parts: [
-                {
-                  type: "text",
-                  text: buildProjectStateContext(projectState),
-                },
-              ],
-            } satisfies UIMessage,
-            ...(messages as UIMessage[]),
-          ]),
+          messages: await convertToModelMessages(messages as UIMessage[]),
           onFinish: async () => {
             if (pikaClient) {
               try { await pikaClient.close(); } catch {}
