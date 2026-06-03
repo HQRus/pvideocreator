@@ -99,6 +99,7 @@ async function pikaGenerateImage(
   tools: Record<string, unknown>,
   promptText: string,
   aspect: string,
+  referenceImageUrls: string[] = [],
 ): Promise<string> {
   const tool = tools["generate_image"] as
     | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
@@ -108,6 +109,33 @@ async function pikaGenerateImage(
   const args: Record<string, unknown> = {};
   setFirst(args, keys, ["prompt", "promptText", "text", "description"], promptText);
   setFirst(args, keys, ["aspect_ratio", "aspectRatio", "aspect"], aspect);
+  if (referenceImageUrls.length > 0) {
+    // Try array-shaped reference inputs first (nano-banana-pro style),
+    // then fall back to single-image keys.
+    const accepted = setFirst(
+      args,
+      keys,
+      [
+        "image_urls",
+        "imageUrls",
+        "images",
+        "reference_images",
+        "referenceImages",
+        "input_images",
+        "inputImages",
+        "refImages",
+      ],
+      referenceImageUrls,
+    );
+    if (!accepted) {
+      setFirst(
+        args,
+        keys,
+        ["image_url", "imageUrl", "image", "reference_image", "referenceImage"],
+        referenceImageUrls[0],
+      );
+    }
+  }
   const out = await tool.execute(args, {});
   let urls = sweepCandidateImageUrls(out);
   if (urls.length === 0) {
