@@ -481,6 +481,7 @@ export const retryRenderScene = createServerFn({ method: "POST" })
           aspect: state.meta.aspectRatio || "16:9",
           pikaTools,
           gatewayKey: key,
+          referenceImageUrls: pickSceneReferenceUrls(state, scene),
         });
       } finally {
         if (pikaClient) {
