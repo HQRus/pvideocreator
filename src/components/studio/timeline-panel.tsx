@@ -272,10 +272,10 @@ export function TimelinePanel({
       </div>
 
       {/* Timeline */}
-      <div ref={trackRef} className="relative flex-1 overflow-x-auto overflow-y-hidden">
+      <div ref={trackRef} className="relative flex-1 overflow-auto">
         <div
           style={{ width: Math.max(totalDuration * pps + 200, 800) }}
-          className="relative h-full select-none pt-2"
+          className="relative select-none pt-2 pb-6"
         >
           {/* Ruler */}
           <div
