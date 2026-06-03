@@ -298,15 +298,6 @@ function Studio() {
         </div>
       </aside>
 
-      {!panelOpen && (
-        <button
-          onClick={() => setPanelOpen(true)}
-          className="absolute right-4 top-1/2 z-30 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-card text-muted-foreground shadow-elegant transition hover:text-foreground"
-          aria-label="Open project panel"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-      )}
     </div>
   );
 }
