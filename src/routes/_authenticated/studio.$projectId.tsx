@@ -129,7 +129,11 @@ function Studio() {
   const [activeSceneId, setActiveSceneId] = useState<string>(
     INITIAL_PROJECT.scenes[0]?.id ?? "",
   );
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Panel auto-shows whenever the project has something to display
+  // (scenes, cast, music, or assets). User can still collapse/expand
+  // manually; the manual preference resets whenever the content state
+  // flips, so a freshly-populated project always reveals the panel.
+  const [userPanelPref, setUserPanelPref] = useState<boolean | null>(null);
   const [panelWidth, setPanelWidth] = useState<number>(() => {
     if (typeof window === "undefined") return 440;
     const saved = Number(window.localStorage.getItem("studio:panelWidth"));
@@ -178,6 +182,13 @@ function Studio() {
     window.addEventListener("mouseup", onUp);
   };
   const { scenes, cast, music, meta, assets } = project;
+  const hasPanelContent =
+    scenes.length > 0 || cast.length > 0 || !!music || assets.length > 0;
+  const panelOpen = hasPanelContent && (userPanelPref ?? true);
+  useEffect(() => {
+    // Reset manual override when content presence toggles.
+    setUserPanelPref(null);
+  }, [hasPanelContent]);
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
   // Subscribe to live project_state updates pushed by the render pipeline,
