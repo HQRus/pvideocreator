@@ -1430,6 +1430,17 @@ function StructurePanel({
           </div>
           )}
         </TabsContent>
+
+        <TabsContent value="timeline" className="m-0 flex-1 overflow-hidden">
+          <TimelinePanel
+            scenes={scenes}
+            setScenes={setScenes}
+            activeSceneId={activeSceneId}
+            onSelect={onSelect}
+            music={music}
+            assets={assets}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Floating sticky action bar */}
