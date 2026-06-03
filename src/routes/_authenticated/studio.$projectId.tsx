@@ -1280,9 +1280,9 @@ function StructurePanel({
             {[
               { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
               { v: "scenes", icon: Film, label: "Scenes" },
-            { v: "timeline", icon: ListVideo, label: "Timeline" },
               { v: "cast", icon: Users, label: "Cast" },
               { v: "music", icon: Music2, label: "Audio" },
+              { v: "timeline", icon: ListVideo, label: "Timeline" },
             ].map(({ v, icon: Icon, label }) => (
               <TabsTrigger
                 key={v}
