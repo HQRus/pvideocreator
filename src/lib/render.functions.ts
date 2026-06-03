@@ -29,6 +29,39 @@ import {
 const KEYFRAME_MODEL = "google/gemini-2.5-flash-image";
 const PIKA_KEYFRAME_MODEL = "pika:generate_image";
 
+// Pick reference image URLs that should be used to condition a scene's
+// keyframe. Strategy:
+//   1. Find cast members whose name appears in scene.prompt/title.
+//   2. For each, resolve cast.ref → asset.url (if asset exists).
+//   3. If no cast match, fall back to every asset of kind "likeness" so
+//      single-character "me eating sushi" projects still get the user's
+//      face applied across all frames.
+function pickSceneReferenceUrls(
+  state: ProjectState,
+  scene: { title: string; prompt: string },
+): string[] {
+  const assetById = new Map(state.assets.map((a) => [a.id, a]));
+  const haystack = `${scene.title} ${scene.prompt}`.toLowerCase();
+  const matchedUrls: string[] = [];
+  for (const c of state.cast) {
+    if (!c.ref) continue;
+    const asset = assetById.get(c.ref);
+    if (!asset?.url) continue;
+    const name = (c.name || "").trim().toLowerCase();
+    if (name && haystack.includes(name)) matchedUrls.push(asset.url);
+  }
+  if (matchedUrls.length > 0) return dedupe(matchedUrls);
+  // Fallback: every uploaded/generated likeness on the project.
+  const likenessUrls = state.assets
+    .filter((a) => a.kind === "likeness" && !!a.url)
+    .map((a) => a.url);
+  return dedupe(likenessUrls);
+}
+
+function dedupe(arr: string[]): string[] {
+  return Array.from(new Set(arr));
+}
+
 async function ownProject(projectId: string, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("projects")
@@ -44,9 +77,22 @@ async function ownProject(projectId: string, userId: string) {
 async function gatewayKeyframe(
   prompt: string,
   apiKey: string,
+  referenceImageUrls: string[] = [],
 ): Promise<{ b64: string; mime: string }> {
   // Use the gateway's chat completions endpoint with an image model. It
-  // returns the image as base64 inside the assistant message.
+  // returns the image as base64 inside the assistant message. When we have
+  // reference images (likeness shots) we send them as multimodal content so
+  // the model can condition on the person's actual face.
+  const content: unknown =
+    referenceImageUrls.length === 0
+      ? `Single cinematic still frame: ${prompt}`
+      : [
+          { type: "text", text: `Single cinematic still frame: ${prompt}` },
+          ...referenceImageUrls.map((url) => ({
+            type: "image_url",
+            image_url: { url },
+          })),
+        ];
   const res = await fetch(
     "https://ai.gateway.lovable.dev/v1/chat/completions",
     {
@@ -58,10 +104,7 @@ async function gatewayKeyframe(
       body: JSON.stringify({
         model: KEYFRAME_MODEL,
         messages: [
-          {
-            role: "user",
-            content: `Single cinematic still frame: ${prompt}`,
-          },
+          { role: "user", content },
         ],
         modalities: ["image", "text"],
       }),
@@ -99,6 +142,7 @@ async function pikaGenerateImage(
   tools: Record<string, unknown>,
   promptText: string,
   aspect: string,
+  referenceImageUrls: string[] = [],
 ): Promise<string> {
   const tool = tools["generate_image"] as
     | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
@@ -108,6 +152,33 @@ async function pikaGenerateImage(
   const args: Record<string, unknown> = {};
   setFirst(args, keys, ["prompt", "promptText", "text", "description"], promptText);
   setFirst(args, keys, ["aspect_ratio", "aspectRatio", "aspect"], aspect);
+  if (referenceImageUrls.length > 0) {
+    // Try array-shaped reference inputs first (nano-banana-pro style),
+    // then fall back to single-image keys.
+    const accepted = setFirst(
+      args,
+      keys,
+      [
+        "image_urls",
+        "imageUrls",
+        "images",
+        "reference_images",
+        "referenceImages",
+        "input_images",
+        "inputImages",
+        "refImages",
+      ],
+      referenceImageUrls,
+    );
+    if (!accepted) {
+      setFirst(
+        args,
+        keys,
+        ["image_url", "imageUrl", "image", "reference_image", "referenceImage"],
+        referenceImageUrls[0],
+      );
+    }
+  }
   const out = await tool.execute(args, {});
   let urls = sweepCandidateImageUrls(out);
   if (urls.length === 0) {
@@ -135,10 +206,21 @@ async function generateAndStoreKeyframe(opts: {
   aspect: string;
   pikaTools: Record<string, unknown> | null;
   gatewayKey: string;
+  referenceImageUrls?: string[];
 }): Promise<StoredKeyframe> {
+  const refUrls = opts.referenceImageUrls ?? [];
+  const promptWithRefHint =
+    refUrls.length > 0
+      ? `${opts.promptText}\n\nIMPORTANT: Match the exact likeness, face, hair, and identifying features of the person shown in the attached reference image(s). Keep the same person recognizable across every frame.`
+      : opts.promptText;
   if (opts.pikaTools && opts.pikaTools["generate_image"]) {
     try {
-      const url = await pikaGenerateImage(opts.pikaTools, opts.promptText, opts.aspect);
+      const url = await pikaGenerateImage(
+        opts.pikaTools,
+        promptWithRefHint,
+        opts.aspect,
+        refUrls,
+      );
       const stored = await downloadAndStoreUrl({
         projectId: opts.projectId,
         userId: opts.userId,
@@ -154,7 +236,7 @@ async function generateAndStoreKeyframe(opts: {
       );
     }
   }
-  const { b64, mime } = await gatewayKeyframe(opts.promptText, opts.gatewayKey);
+  const { b64, mime } = await gatewayKeyframe(promptWithRefHint, opts.gatewayKey, refUrls);
   const stored = await storeAsset({
     projectId: opts.projectId,
     userId: opts.userId,
@@ -252,6 +334,7 @@ export const startRender = createServerFn({ method: "POST" })
         const promptText =
           scene.prompt?.trim() ||
           `${state.meta.title || "Scene"} — ${scene.title}`;
+        const referenceImageUrls = pickSceneReferenceUrls(state, scene);
         const stored = await generateAndStoreKeyframe({
           projectId: data.projectId,
           userId,
@@ -261,6 +344,7 @@ export const startRender = createServerFn({ method: "POST" })
           aspect,
           pikaTools,
           gatewayKey: key,
+          referenceImageUrls,
         });
 
         // Merge the new thumb into project_state by re-reading then patching.
@@ -397,6 +481,7 @@ export const retryRenderScene = createServerFn({ method: "POST" })
           aspect: state.meta.aspectRatio || "16:9",
           pikaTools,
           gatewayKey: key,
+          referenceImageUrls: pickSceneReferenceUrls(state, scene),
         });
       } finally {
         if (pikaClient) {
