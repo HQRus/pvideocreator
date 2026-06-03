@@ -1238,12 +1238,19 @@ function StructurePanel({
       setRenderMsg("Draft at least one scene first — describe the concept in chat.");
       return;
     }
+    const likenessAssetIds = Array.from(
+      new Set([
+        ...cast.map((c) => c.ref).filter(Boolean),
+        ...assets.filter((a) => a.kind === "likeness").map((a) => a.id),
+      ]),
+    );
     setRenderMsg("Asked the director to generate keyframes.");
     onChatCommand?.(
       `GENERATE KEYFRAMES NOW for every scene that doesn't already have one. ` +
       `For each such scene, call the generate_image tool with a vivid, cinematic prompt that bakes in: ` +
       `(1) the project logline, (2) the scene title + scene prompt, (3) the cast notes & any uploaded ` +
       `likeness/reference assets, and (4) a consistent visual style across all keyframes. ` +
+      `${likenessAssetIds.length ? `Use referenceAssetIds=${JSON.stringify(likenessAssetIds)} anywhere the user or cast should appear so their face is actually used in generation. ` : ""}` +
       `After each image returns, emit a commit_project_patch that updates scenes[i].thumb to the new ` +
       `asset URL (and sets status to "ready"). Do all scenes in this turn. Final card: a short handoff ` +
       `confirming how many keyframes were generated.`,
