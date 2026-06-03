@@ -334,6 +334,7 @@ export const startRender = createServerFn({ method: "POST" })
         const promptText =
           scene.prompt?.trim() ||
           `${state.meta.title || "Scene"} — ${scene.title}`;
+        const referenceImageUrls = pickSceneReferenceUrls(state, scene);
         const stored = await generateAndStoreKeyframe({
           projectId: data.projectId,
           userId,
@@ -343,6 +344,7 @@ export const startRender = createServerFn({ method: "POST" })
           aspect,
           pikaTools,
           gatewayKey: key,
+          referenceImageUrls,
         });
 
         // Merge the new thumb into project_state by re-reading then patching.
