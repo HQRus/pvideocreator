@@ -240,17 +240,19 @@ export function TimelinePanel({
         </div>
       </div>
 
-      {/* Preview video (visible only while clips exist) */}
-      {canPlay && (
-        <div className="border-b border-border/40 bg-black">
+      {/* Large preview — always on top */}
+      <div className="flex items-center justify-center border-b border-border/40 bg-black"
+           style={{ minHeight: 280 }}>
+        {canPlay ? (
           <video
             ref={videoRef}
-            className="mx-auto max-h-[40vh] w-auto"
+            className="max-h-[55vh] w-auto"
             playsInline
-            muted={false}
           />
-        </div>
-      )}
+        ) : (
+          <PreviewPlaceholder scenes={scenes} playhead={playhead} />
+        )}
+      </div>
 
       {/* Timeline */}
       <div ref={trackRef} className="relative flex-1 overflow-x-auto overflow-y-hidden">
@@ -293,8 +295,10 @@ export function TimelinePanel({
             ))}
           </div>
 
-          {/* Scene track */}
-          <div className="relative mt-3 flex h-32 items-stretch gap-1 px-0">
+          {/* Tracks */}
+          {/* Video / scenes track */}
+          <TrackLabel icon={<Film className="h-3 w-3" />} label="Video" top={40} />
+          <div className="relative mt-3 flex h-28 items-stretch gap-1 px-0">
             {scenes.map((s, i) => {
               const w = Math.max(40, (s.duration || 1) * pps);
               const left = (starts[i] ?? 0) * pps;
@@ -367,6 +371,17 @@ export function TimelinePanel({
               );
             })}
           </div>
+
+          {/* Audio tracks */}
+          {audioTracks.map((tr, idx) => (
+            <AudioTrack
+              key={tr.key}
+              track={tr}
+              pps={pps}
+              totalDuration={totalDuration}
+              topLabelOffset={40 + 28 * 4 + 16 + idx * 56 + idx * 8}
+            />
+          ))}
 
           {/* Playhead */}
           <div
