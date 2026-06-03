@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Copy, Trash2, Music2 } from "lucide-react";
-import type { Scene, Music } from "@/lib/project-state";
+import { Play, Pause, Copy, Trash2, Music2, Mic, Volume2, Film } from "lucide-react";
+import type { Scene, Music, ProjectAsset } from "@/lib/project-state";
 import { cn } from "@/lib/utils";
 
 // pixels per second baseline; clamped by zoom
@@ -14,12 +14,14 @@ export function TimelinePanel({
   activeSceneId,
   onSelect,
   music,
+  assets,
 }: {
   scenes: Scene[];
   setScenes: (s: Scene[]) => void;
   activeSceneId: string;
   onSelect: (id: string) => void;
   music: Music;
+  assets: ProjectAsset[];
 }) {
   const [zoom, setZoom] = useState(1);
   const pps = BASE_PPS * zoom;
@@ -238,23 +240,42 @@ export function TimelinePanel({
         </div>
       </div>
 
-      {/* Preview video (visible only while clips exist) */}
-      {canPlay && (
-        <div className="border-b border-border/40 bg-black">
+      {/* Large preview — always on top */}
+      <div className="flex items-center justify-center border-b border-border/40 bg-black"
+           style={{ minHeight: 280 }}>
+        {canPlay ? (
           <video
             ref={videoRef}
-            className="mx-auto max-h-[40vh] w-auto"
+            className="max-h-[55vh] w-auto"
             playsInline
-            muted={false}
           />
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-muted-foreground">
+            {(() => {
+              // show keyframe at current playhead
+              let acc = 0;
+              const cur = scenes.find((s) => {
+                const end = acc + (s.duration || 0);
+                const hit = playhead >= acc && playhead < end;
+                acc = end;
+                return hit;
+              }) ?? scenes[0];
+              return cur?.thumb ? (
+                <img src={cur.thumb} alt={cur.title} className="max-h-[45vh] w-auto rounded-md" />
+              ) : (
+                <span className="text-sm">No preview yet — generate keyframes and clips.</span>
+              );
+            })()}
+            <span className="text-xs">Render clips to enable stitched playback.</span>
+          </div>
+        )}
+      </div>
 
       {/* Timeline */}
-      <div ref={trackRef} className="relative flex-1 overflow-x-auto overflow-y-hidden">
+      <div ref={trackRef} className="relative flex-1 overflow-auto">
         <div
           style={{ width: Math.max(totalDuration * pps + 200, 800) }}
-          className="relative h-full select-none pt-2"
+          className="relative select-none pt-2 pb-6"
         >
           {/* Ruler */}
           <div
@@ -291,8 +312,12 @@ export function TimelinePanel({
             ))}
           </div>
 
-          {/* Scene track */}
-          <div className="relative mt-3 flex h-32 items-stretch gap-1 px-0">
+          {/* Tracks */}
+          {/* Video / scenes track */}
+          <div className="sticky left-0 z-10 mt-3 mb-1 flex w-fit items-center gap-1 rounded bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground backdrop-blur">
+            <Film className="h-3 w-3" /> Video
+          </div>
+          <div className="relative flex h-28 items-stretch gap-1 px-0">
             {scenes.map((s, i) => {
               const w = Math.max(40, (s.duration || 1) * pps);
               const left = (starts[i] ?? 0) * pps;
@@ -365,6 +390,67 @@ export function TimelinePanel({
               );
             })}
           </div>
+
+          {/* Audio tracks */}
+          {music && (
+            <>
+              <div className="sticky left-0 z-10 mt-4 mb-1 flex w-fit items-center gap-1 rounded bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground backdrop-blur">
+                <Music2 className="h-3 w-3" /> Music
+                <span className="ml-1 normal-case text-muted-foreground/70">
+                  {music.title}{music.artist ? ` — ${music.artist}` : ""}
+                  {music.bpm ? ` · ${music.bpm} BPM` : ""}
+                </span>
+              </div>
+              <div className="relative h-12 rounded-md border border-border/40 bg-primary/5"
+                   style={{ width: Math.max((music.duration || totalDuration) * pps, 40) }}>
+                {beats.map((b, i) => (
+                  <div
+                    key={`mb${i}`}
+                    className="absolute top-1 bottom-1 w-px bg-primary/60"
+                    style={{ left: b * pps }}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {assets
+            .filter((a) => a.kind === "voice" || a.kind === "audio")
+            .map((a) => {
+              const dur = a.duration && a.duration > 0 ? a.duration : Math.max(totalDuration, 5);
+              const isVoice = a.kind === "voice";
+              return (
+                <div key={a.id}>
+                  <div className="sticky left-0 z-10 mt-3 mb-1 flex w-fit items-center gap-1 rounded bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground backdrop-blur">
+                    {isVoice ? <Mic className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                    {isVoice ? "Voice" : "Audio"}
+                    <span className="ml-1 normal-case text-muted-foreground/70">{a.label || a.name}</span>
+                  </div>
+                  <div
+                    className={cn(
+                      "relative h-10 rounded-md border",
+                      isVoice ? "border-amber-500/40 bg-amber-500/10" : "border-emerald-500/40 bg-emerald-500/10",
+                    )}
+                    style={{ width: Math.max(dur * pps, 40) }}
+                    title={`${a.name} · ${dur.toFixed(1)}s`}
+                  >
+                    {/* faux waveform bars */}
+                    <div className="absolute inset-1 flex items-center gap-[2px] overflow-hidden">
+                      {Array.from({ length: Math.floor(dur * 8) }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "w-[2px] rounded",
+                            isVoice ? "bg-amber-500/70" : "bg-emerald-500/70",
+                          )}
+                          style={{ height: `${30 + ((i * 37) % 60)}%` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          <div className="h-4" />
 
           {/* Playhead */}
           <div

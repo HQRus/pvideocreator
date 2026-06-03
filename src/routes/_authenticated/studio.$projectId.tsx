@@ -1314,6 +1314,7 @@ function StructurePanel({
             activeSceneId={activeSceneId}
             onSelect={onSelect}
             music={music}
+            assets={assets}
           />
         </TabsContent>
 
