@@ -279,7 +279,8 @@ function Studio() {
           duration={totalDuration}
           sceneCount={scenes.length}
           panelOpen={panelOpen}
-          onTogglePanel={() => setPanelOpen((o) => !o)}
+          canTogglePanel={hasPanelContent}
+          onTogglePanel={() => setUserPanelPref(!panelOpen)}
         />
         <div className="min-h-0 flex-1">
           <ChatPanel
