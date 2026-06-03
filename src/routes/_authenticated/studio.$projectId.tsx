@@ -1307,6 +1307,16 @@ function StructurePanel({
           </div>
         </TabsContent>
 
+        <TabsContent value="timeline" className="m-0 flex-1 overflow-hidden">
+          <TimelinePanel
+            scenes={scenes}
+            setScenes={setScenes}
+            activeSceneId={activeSceneId}
+            onSelect={onSelect}
+            music={music}
+          />
+        </TabsContent>
+
         <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
             {cast.length === 0 && (
