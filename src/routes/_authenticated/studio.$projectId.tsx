@@ -534,12 +534,14 @@ function StudioTopBar({
   duration,
   sceneCount,
   panelOpen,
+  canTogglePanel,
   onTogglePanel,
 }: {
   meta: { title: string; format: string; aspectRatio: string };
   duration: number;
   sceneCount: number;
   panelOpen: boolean;
+  canTogglePanel: boolean;
   onTogglePanel: () => void;
 }) {
   return (
@@ -556,13 +558,15 @@ function StudioTopBar({
           </div>
         </div>
       </div>
-      <button
-        onClick={onTogglePanel}
-        className="pointer-events-auto absolute right-6 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-        aria-label={panelOpen ? "Collapse project panel" : "Open project panel"}
-      >
-        {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
+      {canTogglePanel && (
+        <button
+          onClick={onTogglePanel}
+          className="pointer-events-auto absolute right-6 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label={panelOpen ? "Collapse project panel" : "Open project panel"}
+        >
+          {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      )}
     </header>
   );
 }
