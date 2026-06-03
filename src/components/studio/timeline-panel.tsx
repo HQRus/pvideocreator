@@ -240,8 +240,8 @@ export function TimelinePanel({
         </div>
       </div>
 
-      {/* Large preview — takes all available vertical room */}
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden border-b border-border/40 bg-black">
+      {/* Large preview — compact so timeline stays visible */}
+      <div className="flex h-48 min-h-0 items-center justify-center overflow-hidden border-b border-border/40 bg-black">
         {canPlay ? (
           <video
             ref={videoRef}
