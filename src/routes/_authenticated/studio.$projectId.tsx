@@ -18,6 +18,7 @@ import { startProduction } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
+  ListVideo,
   Pause,
   Download,
   Share2,
@@ -37,6 +38,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { TimelinePanel } from "@/components/studio/timeline-panel";
 import {
   Conversation,
   ConversationContent,
@@ -1259,6 +1261,7 @@ function StructurePanel({
             {[
               { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
               { v: "scenes", icon: Film, label: "Scenes" },
+            { v: "timeline", icon: ListVideo, label: "Timeline" },
               { v: "cast", icon: Users, label: "Cast" },
               { v: "music", icon: Music2, label: "Audio" },
             ].map(({ v, icon: Icon, label }) => (
@@ -1302,6 +1305,16 @@ function StructurePanel({
               <Plus className="h-5 w-5" /> Add scene
             </button>
           </div>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="m-0 flex-1 overflow-hidden">
+          <TimelinePanel
+            scenes={scenes}
+            setScenes={setScenes}
+            activeSceneId={activeSceneId}
+            onSelect={onSelect}
+            music={music}
+          />
         </TabsContent>
 
         <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
