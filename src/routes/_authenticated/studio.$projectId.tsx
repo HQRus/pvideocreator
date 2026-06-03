@@ -239,7 +239,10 @@ function Studio() {
   return (
     <div className="relative h-screen w-full overflow-hidden bg-background p-10 text-foreground">
       {/* Centered chat fills the screen; gallery & project panel float over it */}
-      <div className="absolute inset-0 flex flex-col">
+      <div
+        className="absolute inset-0 flex flex-col transition-[padding] duration-200 ease-out"
+        style={{ paddingRight: panelOpen ? panelWidth + 32 : 0 }}
+      >
         <StudioTopBar
           meta={meta}
           duration={totalDuration}
@@ -247,10 +250,7 @@ function Studio() {
           panelOpen={panelOpen}
           onTogglePanel={() => setPanelOpen((o) => !o)}
         />
-        <div
-          className="min-h-0 flex-1 transition-[padding] duration-200 ease-out"
-          style={{ paddingRight: panelOpen ? panelWidth + 32 : 0 }}
-        >
+        <div className="min-h-0 flex-1">
           <ChatPanel
             projectId={projectId}
             initialMessages={initialMessages}
