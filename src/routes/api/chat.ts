@@ -629,6 +629,18 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Project not found", { status: 404 });
         }
 
+        const { data: projectRow, error: projectError } = await supabaseAdmin
+          .from("projects")
+          .select("project_state")
+          .eq("id", projectId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (projectError) {
+          return new Response(projectError.message, { status: 500 });
+        }
+        const projectState = (projectRow?.project_state as ProjectState | null) ?? INITIAL_PROJECT;
+        const assetUrlById = new Map(projectState.assets.map((asset) => [asset.id, asset.url]));
+
         // Persist the latest user message before streaming.
         const lastUser = (messages as UIMessage[])[messages.length - 1];
         if (lastUser?.role === "user" && lastUser.id) {
@@ -668,10 +680,25 @@ export const Route = createFileRoute("/api/chat")({
                 ])
                 .optional(),
               label: z.string().max(120).optional(),
+              referenceAssetIds: z.array(z.string().min(1).max(120)).max(8).optional(),
+              referenceImageUrls: z.array(z.string().url()).max(8).optional(),
             }),
-            execute: async ({ prompt, kind, label }) => {
+            execute: async ({ prompt, kind, label, referenceAssetIds, referenceImageUrls }) => {
               try {
-                const { b64, mime } = await gatewayGenerateImage(prompt, key);
+                const resolvedReferenceUrls = Array.from(
+                  new Set([
+                    ...(referenceAssetIds ?? []).map((id) => assetUrlById.get(id) ?? ""),
+                    ...(referenceImageUrls ?? []),
+                  ].filter((url): url is string => !!url && /^https?:|^blob:|^data:|^\//.test(url))),
+                );
+                const promptWithRefs = resolvedReferenceUrls.length
+                  ? `${prompt}\n\nIMPORTANT: Match the exact likeness, face, hair, skin tone, and identifying features from the provided reference image(s). Keep this person clearly recognizable.`
+                  : prompt;
+                const { b64, mime } = await gatewayGenerateImage(
+                  promptWithRefs,
+                  key,
+                  resolvedReferenceUrls,
+                );
                 const bytes = base64ToBytes(b64);
                 // Persist durably so the asset survives page reload.
                 try {
@@ -807,7 +834,19 @@ export const Route = createFileRoute("/api/chat")({
           system: SYSTEM_PROMPT,
           tools: tools as never,
           stopWhen: stepCountIs(50) as never,
-          messages: await convertToModelMessages(messages as UIMessage[]),
+          messages: await convertToModelMessages([
+            {
+              id: `project-state-${projectId}`,
+              role: "system",
+              parts: [
+                {
+                  type: "text",
+                  text: buildProjectStateContext(projectState),
+                },
+              ],
+            } satisfies UIMessage,
+            ...(messages as UIMessage[]),
+          ]),
           onFinish: async () => {
             if (pikaClient) {
               try { await pikaClient.close(); } catch {}
