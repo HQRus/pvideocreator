@@ -32,10 +32,107 @@ const nextToolAssetId = () =>
 // Walk an arbitrary value for video-ish URLs (used to summarize Pika output in logs).
 const sweepVideoUrls = sweepCandidateVideoUrls;
 
+const CHAT_IMAGE_MODEL = "google/gemini-2.5-flash-image";
+
+function truncateLine(value: string, max = 220): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+function buildProjectStateContext(state: ProjectState | null | undefined): string {
+  const current = state ?? INITIAL_PROJECT;
+  const meta = [
+    `title=${current.meta.title || "—"}`,
+    `format=${current.meta.format || "—"}`,
+    `aspect=${current.meta.aspectRatio || "—"}`,
+    `logline=${current.meta.logline || "—"}`,
+  ].join(" | ");
+  const cast = current.cast.length
+    ? current.cast
+        .map((c) =>
+          truncateLine(
+            `- ${c.id}: ${c.name || "Unnamed"} (${c.role || "Character"}) ref=${c.ref || "none"} notes=${c.notes || "—"}`,
+          ),
+        )
+        .join("\n")
+    : "- none";
+  const scenes = current.scenes.length
+    ? current.scenes
+        .map((s) =>
+          truncateLine(
+            `- ${s.id}: #${s.n} ${s.title || "Untitled scene"} | prompt=${s.prompt || "—"} | thumb=${s.thumb || "none"}`,
+          ),
+        )
+        .join("\n")
+    : "- none";
+  const assets = current.assets.length
+    ? current.assets
+        .map((a) =>
+          truncateLine(
+            `- ${a.id}: kind=${a.kind} label=${a.label || a.name || "asset"} attachedTo=${a.attachedTo || "—"} url=${a.url || "—"}`,
+            260,
+          ),
+        )
+        .join("\n")
+    : "- none";
+
+  return [
+    "CURRENT PROJECT STATE:",
+    `Meta: ${meta}`,
+    "Cast:",
+    cast,
+    "Scenes:",
+    scenes,
+    "Assets:",
+    assets,
+  ].join("\n");
+}
+
 async function gatewayGenerateImage(
   prompt: string,
   apiKey: string,
+  referenceImageUrls: string[] = [],
 ): Promise<{ b64: string; mime: string }> {
+  if (referenceImageUrls.length > 0) {
+    const res = await fetch(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: CHAT_IMAGE_MODEL,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                ...referenceImageUrls.map((url) => ({
+                  type: "image_url",
+                  image_url: { url },
+                })),
+              ],
+            },
+          ],
+          modalities: ["image", "text"],
+        }),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Image gateway error ${res.status}: ${await res.text()}`);
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{
+        message?: { images?: Array<{ image_url?: { url?: string } }> };
+      }>;
+    };
+    const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    if (!url) throw new Error("Image gateway returned no image");
+    const match = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) throw new Error("unexpected image_url format");
+    return { mime: match[1], b64: match[2] };
+  }
   const res = await fetch(
     "https://ai.gateway.lovable.dev/v1/images/generations",
     {
@@ -442,7 +539,7 @@ You may call tools mid-turn before emitting the final HTML card. After each
 tool returns, you MUST eventually emit ONE card as your final assistant
 message. The card is the user-facing response; tool results alone are not.
 
-- generate_image({ prompt, kind?, label? }) → asset descriptor
+- generate_image({ prompt, kind?, label?, referenceAssetIds?, referenceImageUrls? }) → asset descriptor
   Generate a visual reference (likeness sketch, scene concept, logo idea,
   storyboard frame, mood image). The runtime auto-attaches the returned
   asset to project state. Reference it in your card with
@@ -450,6 +547,9 @@ message. The card is the user-facing response; tool results alone are not.
   Use it any time a picture is faster than a paragraph — confirming a
   vibe, sketching a character, generating a placeholder anchor desk while
   the user uploads their selfie.
+  When generating keyframes or character shots, you MUST pass the relevant
+  project likeness/reference inputs through referenceAssetIds and/or
+  referenceImageUrls so the actual face is preserved in the result.
 
 - search_stock_media({ query, limit? }) → { assets: [...] }
   Find ready-to-use stock references. Same asset shape, also auto-attached.
