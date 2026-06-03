@@ -29,6 +29,39 @@ import {
 const KEYFRAME_MODEL = "google/gemini-2.5-flash-image";
 const PIKA_KEYFRAME_MODEL = "pika:generate_image";
 
+// Pick reference image URLs that should be used to condition a scene's
+// keyframe. Strategy:
+//   1. Find cast members whose name appears in scene.prompt/title.
+//   2. For each, resolve cast.ref → asset.url (if asset exists).
+//   3. If no cast match, fall back to every asset of kind "likeness" so
+//      single-character "me eating sushi" projects still get the user's
+//      face applied across all frames.
+function pickSceneReferenceUrls(
+  state: ProjectState,
+  scene: { title: string; prompt: string },
+): string[] {
+  const assetById = new Map(state.assets.map((a) => [a.id, a]));
+  const haystack = `${scene.title} ${scene.prompt}`.toLowerCase();
+  const matchedUrls: string[] = [];
+  for (const c of state.cast) {
+    if (!c.ref) continue;
+    const asset = assetById.get(c.ref);
+    if (!asset?.url) continue;
+    const name = (c.name || "").trim().toLowerCase();
+    if (name && haystack.includes(name)) matchedUrls.push(asset.url);
+  }
+  if (matchedUrls.length > 0) return dedupe(matchedUrls);
+  // Fallback: every uploaded/generated likeness on the project.
+  const likenessUrls = state.assets
+    .filter((a) => a.kind === "likeness" && !!a.url)
+    .map((a) => a.url);
+  return dedupe(likenessUrls);
+}
+
+function dedupe(arr: string[]): string[] {
+  return Array.from(new Set(arr));
+}
+
 async function ownProject(projectId: string, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("projects")
