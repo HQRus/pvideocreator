@@ -369,21 +369,20 @@ export function TimelinePanel({
             })}
           </div>
 
-          {/* Audio tracks (compact, no per-track label row) */}
           {music && (
             <div
-              className="relative mt-1.5 flex h-9 items-center overflow-hidden rounded-md bg-primary/10 px-2"
+              className="relative mt-1.5 flex h-9 items-center overflow-hidden rounded-md border border-indigo-400/40 bg-indigo-500/25 px-2"
               style={{ width: Math.max((music.duration || totalDuration) * pps, 40) }}
               title={`${music.title}${music.artist ? " — " + music.artist : ""}`}
             >
-              <Music2 className="absolute left-1.5 top-1.5 z-10 h-3 w-3 text-primary/80" />
-              <span className="absolute left-6 top-1 z-10 text-[10px] font-semibold text-primary/90 truncate">
+              <Music2 className="absolute left-1.5 top-1.5 z-10 h-3 w-3 text-indigo-900" />
+              <span className="absolute left-6 top-1 z-10 truncate text-[10px] font-semibold text-indigo-950">
                 {music.title || "Music"}
               </span>
               {beats.map((b, i) => (
                 <div
                   key={`mb${i}`}
-                  className="absolute top-1 bottom-1 w-px bg-primary/50"
+                  className="absolute top-1 bottom-1 w-px bg-indigo-700/70"
                   style={{ left: b * pps }}
                 />
               ))}
@@ -398,21 +397,23 @@ export function TimelinePanel({
                 <div
                   key={a.id}
                   className={cn(
-                    "relative mt-1.5 flex h-9 items-center overflow-hidden rounded-md px-2",
-                    isVoice ? "bg-amber-500/10" : "bg-emerald-500/10",
+                    "relative mt-1.5 flex h-9 items-center overflow-hidden rounded-md border px-2",
+                    isVoice
+                      ? "border-amber-500/50 bg-amber-400/30"
+                      : "border-emerald-500/50 bg-emerald-400/30",
                   )}
                   style={{ width: Math.max(dur * pps, 40) }}
                   title={`${a.name} · ${dur.toFixed(1)}s`}
                 >
                   {isVoice ? (
-                    <Mic className="absolute left-1.5 top-1.5 z-10 h-3 w-3 text-amber-700" />
+                    <Mic className="absolute left-1.5 top-1.5 z-10 h-3 w-3 text-amber-900" />
                   ) : (
-                    <Volume2 className="absolute left-1.5 top-1.5 z-10 h-3 w-3 text-emerald-700" />
+                    <Volume2 className="absolute left-1.5 top-1.5 z-10 h-3 w-3 text-emerald-900" />
                   )}
                   <span
                     className={cn(
                       "absolute left-6 top-1 z-10 truncate text-[10px] font-semibold",
-                      isVoice ? "text-amber-800" : "text-emerald-800",
+                      isVoice ? "text-amber-950" : "text-emerald-950",
                     )}
                   >
                     {a.label || a.name}
@@ -423,7 +424,7 @@ export function TimelinePanel({
                         key={i}
                         className={cn(
                           "w-[2px] rounded",
-                          isVoice ? "bg-amber-500/70" : "bg-emerald-500/70",
+                          isVoice ? "bg-amber-700" : "bg-emerald-700",
                         )}
                         style={{ height: `${30 + ((i * 37) % 60)}%` }}
                       />
