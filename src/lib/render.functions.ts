@@ -44,9 +44,22 @@ async function ownProject(projectId: string, userId: string) {
 async function gatewayKeyframe(
   prompt: string,
   apiKey: string,
+  referenceImageUrls: string[] = [],
 ): Promise<{ b64: string; mime: string }> {
   // Use the gateway's chat completions endpoint with an image model. It
-  // returns the image as base64 inside the assistant message.
+  // returns the image as base64 inside the assistant message. When we have
+  // reference images (likeness shots) we send them as multimodal content so
+  // the model can condition on the person's actual face.
+  const content: unknown =
+    referenceImageUrls.length === 0
+      ? `Single cinematic still frame: ${prompt}`
+      : [
+          { type: "text", text: `Single cinematic still frame: ${prompt}` },
+          ...referenceImageUrls.map((url) => ({
+            type: "image_url",
+            image_url: { url },
+          })),
+        ];
   const res = await fetch(
     "https://ai.gateway.lovable.dev/v1/chat/completions",
     {
@@ -58,10 +71,7 @@ async function gatewayKeyframe(
       body: JSON.stringify({
         model: KEYFRAME_MODEL,
         messages: [
-          {
-            role: "user",
-            content: `Single cinematic still frame: ${prompt}`,
-          },
+          { role: "user", content },
         ],
         modalities: ["image", "text"],
       }),
