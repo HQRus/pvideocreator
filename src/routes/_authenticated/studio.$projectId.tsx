@@ -1280,9 +1280,9 @@ function StructurePanel({
             {[
               { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
               { v: "scenes", icon: Film, label: "Scenes" },
-            { v: "timeline", icon: ListVideo, label: "Timeline" },
               { v: "cast", icon: Users, label: "Cast" },
               { v: "music", icon: Music2, label: "Audio" },
+              { v: "timeline", icon: ListVideo, label: "Timeline" },
             ].map(({ v, icon: Icon, label }) => (
               <TabsTrigger
                 key={v}
@@ -1326,16 +1326,6 @@ function StructurePanel({
           </div>
         </TabsContent>
 
-        <TabsContent value="timeline" className="m-0 flex-1 overflow-hidden">
-          <TimelinePanel
-            scenes={scenes}
-            setScenes={setScenes}
-            activeSceneId={activeSceneId}
-            onSelect={onSelect}
-            music={music}
-            assets={assets}
-          />
-        </TabsContent>
 
         <TabsContent value="cast" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
@@ -1439,6 +1429,17 @@ function StructurePanel({
             </div>
           </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="timeline" className="m-0 flex-1 overflow-hidden">
+          <TimelinePanel
+            scenes={scenes}
+            setScenes={setScenes}
+            activeSceneId={activeSceneId}
+            onSelect={onSelect}
+            music={music}
+            assets={assets}
+          />
         </TabsContent>
       </Tabs>
 
