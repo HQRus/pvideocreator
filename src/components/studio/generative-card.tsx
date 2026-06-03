@@ -575,10 +575,11 @@ export function DecisionPill({
 
   const cleaned = answer
     .replace(
-      /(?:^|\s|·|;)\s*(?:[a-z /]+):\s*[^;·\n]*?\[ast_[a-z0-9]+\]/gi,
+      /(?:^|\s|·|;)\s*(?:[a-z /]+):\s*[^;·\n]*?\[ast_[a-z0-9]+\](?:\s+url=\S+)?/gi,
       "",
     )
     .replace(/\[ast_[a-z0-9]+\]/gi, "")
+    .replace(/\s*url=\S+/gi, "")
     .replace(/^\s*attached\s*[—-]\s*/i, "")
     .replace(/\s*·\s*·\s*/g, " · ")
     .replace(/^[\s·;,-]+|[\s·;,-]+$/g, "")
@@ -641,10 +642,11 @@ export function UserBubble({
   // so the bubble shows clean prose instead of the raw asset summary.
   let cleaned = text
     .replace(
-      /(?:^|\s|·|;)\s*(?:[a-z /]+):\s*[^;·\n]*?\[ast_[a-z0-9]+\]/gi,
+      /(?:^|\s|·|;)\s*(?:[a-z /]+):\s*[^;·\n]*?\[ast_[a-z0-9]+\](?:\s+url=\S+)?/gi,
       "",
     )
     .replace(/\[ast_[a-z0-9]+\]/gi, "")
+    .replace(/\s*url=\S+/gi, "")
     .replace(/^\s*attached\s*[—-]\s*/i, "")
     .replace(/\s*·\s*·\s*/g, " · ")
     .replace(/^[\s·;,-]+|[\s·;,-]+$/g, "")
