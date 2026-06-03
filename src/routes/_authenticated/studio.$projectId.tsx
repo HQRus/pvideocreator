@@ -18,6 +18,7 @@ import { startProduction } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
+  ListVideo,
   Pause,
   Download,
   Share2,
@@ -37,6 +38,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { TimelinePanel } from "@/components/studio/timeline-panel";
 import {
   Conversation,
   ConversationContent,
