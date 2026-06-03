@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Copy, Trash2, Music2 } from "lucide-react";
-import type { Scene, Music } from "@/lib/project-state";
+import { Play, Pause, Copy, Trash2, Music2, Mic, Volume2, Film } from "lucide-react";
+import type { Scene, Music, ProjectAsset } from "@/lib/project-state";
 import { cn } from "@/lib/utils";
 
 // pixels per second baseline; clamped by zoom
@@ -14,12 +14,14 @@ export function TimelinePanel({
   activeSceneId,
   onSelect,
   music,
+  assets,
 }: {
   scenes: Scene[];
   setScenes: (s: Scene[]) => void;
   activeSceneId: string;
   onSelect: (id: string) => void;
   music: Music;
+  assets: ProjectAsset[];
 }) {
   const [zoom, setZoom] = useState(1);
   const pps = BASE_PPS * zoom;
