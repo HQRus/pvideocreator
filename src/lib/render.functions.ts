@@ -163,10 +163,21 @@ async function generateAndStoreKeyframe(opts: {
   aspect: string;
   pikaTools: Record<string, unknown> | null;
   gatewayKey: string;
+  referenceImageUrls?: string[];
 }): Promise<StoredKeyframe> {
+  const refUrls = opts.referenceImageUrls ?? [];
+  const promptWithRefHint =
+    refUrls.length > 0
+      ? `${opts.promptText}\n\nIMPORTANT: Match the exact likeness, face, hair, and identifying features of the person shown in the attached reference image(s). Keep the same person recognizable across every frame.`
+      : opts.promptText;
   if (opts.pikaTools && opts.pikaTools["generate_image"]) {
     try {
-      const url = await pikaGenerateImage(opts.pikaTools, opts.promptText, opts.aspect);
+      const url = await pikaGenerateImage(
+        opts.pikaTools,
+        promptWithRefHint,
+        opts.aspect,
+        refUrls,
+      );
       const stored = await downloadAndStoreUrl({
         projectId: opts.projectId,
         userId: opts.userId,
@@ -182,7 +193,7 @@ async function generateAndStoreKeyframe(opts: {
       );
     }
   }
-  const { b64, mime } = await gatewayKeyframe(opts.promptText, opts.gatewayKey);
+  const { b64, mime } = await gatewayKeyframe(promptWithRefHint, opts.gatewayKey, refUrls);
   const stored = await storeAsset({
     projectId: opts.projectId,
     userId: opts.userId,
