@@ -418,7 +418,7 @@ function FloatingGallery({
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{label}</div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {isCurrent ? "Current project" : `${p.sceneCount} scene${p.sceneCount === 1 ? "" : "s"}`}
+                      {isCurrent ? "Current project" : `${p.sceneCount} shot${p.sceneCount === 1 ? "" : "s"}`}
                     </div>
                   </div>
                 </button>
@@ -533,7 +533,7 @@ function StudioTopBar({
           <div className="flex items-baseline gap-2.5 leading-tight">
             <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
             <span className="text-xs text-background/60">
-              {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
+              {meta.format} · {meta.aspectRatio} · {sceneCount} shots · {formatDuration(duration)}
             </span>
           </div>
         </div>
@@ -865,9 +865,9 @@ function PreviewPanel({
           {scenes.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/20 p-10 text-center">
               <LayoutGrid className="h-6 w-6 text-muted-foreground" />
-              <div className="text-sm font-medium">No scenes yet</div>
+              <div className="text-sm font-medium">No shots yet</div>
               <div className="max-w-xs text-xs text-muted-foreground">
-                As you chat with the director on the left, scenes will appear here.
+                As you chat with the director on the left, shots will appear here.
               </div>
             </div>
           ) : (
@@ -883,7 +883,7 @@ function PreviewPanel({
             <button className="grid aspect-[9/16] place-items-center rounded-xl border border-dashed border-border bg-card/30 text-muted-foreground transition hover:border-primary/50 hover:text-foreground">
               <div className="flex flex-col items-center gap-1">
                 <Plus className="h-5 w-5" />
-                <span className="text-xs">New scene</span>
+                <span className="text-xs">New shot</span>
               </div>
             </button>
           </div>

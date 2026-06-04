@@ -97,7 +97,7 @@ function ProjectsPage() {
                     {p.title}
                   </div>
                   <div className="mt-1 truncate text-xs text-muted-foreground">
-                    {p.sceneCount} scene{p.sceneCount === 1 ? "" : "s"} · updated{" "}
+                    {p.sceneCount} shot{p.sceneCount === 1 ? "" : "s"} · updated{" "}
                     {new Date(p.updatedAt).toLocaleDateString()}
                   </div>
                 </div>
