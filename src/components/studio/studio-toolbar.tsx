@@ -46,8 +46,20 @@ export type StudioToolbarProps = {
 export function StudioToolbar({ mode, model, onChange }: StudioToolbarProps) {
   const [skillsOpen, setSkillsOpen] = useState(false);
   const agent = mode === "agent";
-  const kindModels =
-    mode === "agent" ? [] : SKILLS_BY_KIND(mode);
+  // Many skills share the same underlying model (e.g. every Nano Banana Edit
+  // app points at `fal-ai/nano-banana/edit`). Dedupe by model so the Select
+  // doesn't render duplicate values — Radix shows EVERY item whose value
+  // matches as "selected", which both concatenates their labels in the
+  // trigger and shows multiple checkmarks in the menu.
+  const kindModels = (() => {
+    if (mode === "agent") return [] as Skill[];
+    const seen = new Set<string>();
+    return SKILLS_BY_KIND(mode).filter((s) => {
+      if (seen.has(s.model)) return false;
+      seen.add(s.model);
+      return true;
+    });
+  })();
 
   const setMode = (next: StudioMode) => {
     if (!next || !STUDIO_MODES.some((m) => m.id === next)) return;
@@ -103,12 +115,12 @@ export function StudioToolbar({ mode, model, onChange }: StudioToolbarProps) {
           value={model ?? kindModels[0].model}
           onValueChange={(v) => onChange({ mode, model: v })}
         >
-          <SelectTrigger className="h-8 w-auto min-w-[180px] rounded-full bg-muted/60 px-3 text-xs">
-            <SelectValue placeholder="Pick a model" />
+          <SelectTrigger className="h-8 w-auto max-w-[220px] min-w-[160px] rounded-full bg-muted/60 px-3 text-xs">
+            <SelectValue placeholder="Pick a model" className="truncate" />
           </SelectTrigger>
           <SelectContent>
             {kindModels.map((s) => (
-              <SelectItem key={s.id} value={s.model} className="text-xs">
+              <SelectItem key={s.model} value={s.model} className="text-xs">
                 {s.label}
               </SelectItem>
             ))}
