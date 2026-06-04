@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Pause, Copy, Trash2, Music2, Mic, Volume2, Film } from "lucide-react";
 import type { Scene, Music, ProjectAsset } from "@/lib/project-state";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,7 @@ const BASE_PPS = 60;
 const MIN_DUR = 0.5;
 const MAX_DUR = 60;
 
-function TimelinePanelImpl({
+export function TimelinePanel({
   scenes,
   setScenes,
   activeSceneId,
@@ -32,20 +32,6 @@ function TimelinePanelImpl({
   const [playing, setPlaying] = useState(false);
   const [playhead, setPlayhead] = useState(0); // seconds across full timeline
   const [playIdx, setPlayIdx] = useState(0);
-  const playheadRef = useRef<HTMLDivElement>(null);
-  const timeLabelRef = useRef<HTMLSpanElement>(null);
-  const playheadTimeRef = useRef(0);
-
-  // Keep refs aligned with state when not playing (scrubbing, zoom changes, etc.)
-  useEffect(() => {
-    playheadTimeRef.current = playhead;
-    if (playheadRef.current) {
-      playheadRef.current.style.transform = `translate3d(${playhead * pps}px, 0, 0)`;
-    }
-    if (timeLabelRef.current) {
-      timeLabelRef.current.textContent = `${fmt(playhead)} / ${fmt(totalDuration)}`;
-    }
-  }, [playhead, pps, totalDuration]);
 
   // Cumulative starts per scene
   const starts = useMemo(() => {
@@ -135,8 +121,6 @@ function TimelinePanelImpl({
 
   // Animatic playback: when no rendered clips exist, advance the playhead via rAF
   // so the scrubber moves and the keyframe preview switches scenes in realtime.
-  // We drive the playhead position and time label via refs so we don't re-render
-  // the entire timeline (with all scenes / waveforms) every frame.
   useEffect(() => {
     if (!playing || hasClips) return;
     let raf = 0;
@@ -144,47 +128,29 @@ function TimelinePanelImpl({
     const tick = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
-      let next = playheadTimeRef.current + dt;
-      if (next >= totalDuration) {
-        next = totalDuration;
-        playheadTimeRef.current = next;
-        if (playheadRef.current) {
-          playheadRef.current.style.transform = `translate3d(${next * pps}px, 0, 0)`;
+      setPlayhead((p) => {
+        const next = p + dt;
+        if (next >= totalDuration) {
+          setPlaying(false);
+          return totalDuration;
         }
-        if (timeLabelRef.current) {
-          timeLabelRef.current.textContent = `${fmt(next)} / ${fmt(totalDuration)}`;
+        // keep active scene in sync with playhead
+        let acc = 0;
+        for (const s of scenes) {
+          const end = acc + (s.duration || 0);
+          if (next >= acc && next < end) {
+            if (s.id !== activeSceneId) onSelect(s.id);
+            break;
+          }
+          acc = end;
         }
-        setPlayhead(next);
-        setPlaying(false);
-        return;
-      }
-      playheadTimeRef.current = next;
-      // DOM-only updates → no React re-render per frame.
-      if (playheadRef.current) {
-        playheadRef.current.style.transform = `translate3d(${next * pps}px, 0, 0)`;
-      }
-      if (timeLabelRef.current) {
-        timeLabelRef.current.textContent = `${fmt(next)} / ${fmt(totalDuration)}`;
-      }
-      // Only sync React state when crossing into a new scene.
-      let acc = 0;
-      for (const s of scenes) {
-        const end = acc + (s.duration || 0);
-        if (next >= acc && next < end) {
-          if (s.id !== activeSceneId) onSelect(s.id);
-          break;
-        }
-        acc = end;
-      }
+        return next;
+      });
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(raf);
-      // commit final time back to state so paused position is accurate
-      setPlayhead(playheadTimeRef.current);
-    };
-  }, [playing, hasClips, totalDuration, scenes, activeSceneId, onSelect, pps]);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, hasClips, totalDuration, scenes, activeSceneId, onSelect]);
 
   useEffect(() => {
     if (!playing || !hasClips) return;
@@ -286,10 +252,7 @@ function TimelinePanelImpl({
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {playing ? "Pause" : "Play"}
           </button>
-          <span
-            ref={timeLabelRef}
-            className="ml-2 font-mono text-sm tabular-nums text-muted-foreground"
-          >
+          <span className="ml-2 font-mono text-sm tabular-nums text-muted-foreground">
             {fmt(playhead)} / {fmt(totalDuration)}
           </span>
           {canPlay && !hasClips && (
@@ -514,13 +477,8 @@ function TimelinePanelImpl({
 
           {/* Playhead */}
           <div
-            ref={playheadRef}
             className="pointer-events-none absolute top-0 bottom-0 w-px bg-red-500"
-            style={{
-              left: 12 /* px-3 offset */,
-              transform: `translate3d(${playhead * pps}px, 0, 0)`,
-              willChange: "transform",
-            }}
+            style={{ left: playhead * pps + 12 /* px-3 offset */ }}
           >
             <div className="absolute -left-[5px] -top-1 h-3 w-3 rotate-45 bg-red-500" />
           </div>
@@ -536,4 +494,3 @@ function fmt(t: number) {
   const rem = s % 60;
   return `${m}:${rem.toString().padStart(2, "0")}`;
 }
-export const TimelinePanel = memo(TimelinePanelImpl);
