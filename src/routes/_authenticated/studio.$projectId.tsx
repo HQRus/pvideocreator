@@ -1596,12 +1596,65 @@ function SceneRow({
   onChange: (s: Scene) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  // Parse "W:H" → aspect-ratio CSS value. Default to 16:9 if missing/invalid.
-  const ar = (() => {
+  // Parse "W:H" → aspect-ratio CSS value + orientation. Default to 16:9.
+  const { ar, isHorizontal } = (() => {
     const m = (aspectRatio || "").match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
-    if (!m) return "16 / 9";
-    return `${m[1]} / ${m[2]}`;
+    if (!m) return { ar: "16 / 9", isHorizontal: true };
+    const w = Number(m[1]);
+    const h = Number(m[2]);
+    return { ar: `${w} / ${h}`, isHorizontal: w >= h };
   })();
+
+  const header = (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-xs font-semibold text-muted-foreground">#{scene.n}</span>
+        <span className="truncate text-base font-bold tracking-tight">{scene.title}</span>
+      </div>
+      <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+        {scene.duration}s
+      </span>
+    </div>
+  );
+
+  const description = editing ? (
+    <textarea
+      autoFocus
+      defaultValue={scene.prompt}
+      onBlur={(e) => {
+        onChange({ ...scene, prompt: e.target.value });
+        setEditing(false);
+      }}
+      rows={5}
+      className="mt-3 w-full resize-none rounded-xl border border-border bg-background/60 p-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+    />
+  ) : (
+    <p
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      className="mt-2 text-sm leading-relaxed text-muted-foreground hover:text-foreground"
+    >
+      {scene.prompt}
+    </p>
+  );
+
+  const thumb = (
+    <div
+      className={`overflow-hidden rounded-xl bg-muted ${isHorizontal ? "w-full" : "w-72 shrink-0"}`}
+      style={{ aspectRatio: ar }}
+    >
+      {scene.thumb ? (
+        <img src={scene.thumb} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="grid h-full w-full place-items-center text-muted-foreground/50">
+          <Film className="h-7 w-7" />
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div
       onClick={onClick}
@@ -1609,58 +1662,23 @@ function SceneRow({
         active ? "border-primary/60 shadow-glow" : "border-border/60 hover:border-foreground/30"
       }`}
     >
-      <div className="flex items-start gap-4">
-        <GripVertical className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50" />
-        <div
-          className="w-72 shrink-0 overflow-hidden rounded-xl bg-muted"
-          style={{ aspectRatio: ar }}
-        >
-          {scene.thumb ? (
-            <img
-              src={scene.thumb}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="grid h-full w-full place-items-center text-muted-foreground/50">
-              <Film className="h-7 w-7" />
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-semibold text-muted-foreground">#{scene.n}</span>
-              <span className="truncate text-base font-bold tracking-tight">{scene.title}</span>
-            </div>
-            <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-              {scene.duration}s
-            </span>
+      {isHorizontal ? (
+        <div className="flex flex-col gap-4">
+          {thumb}
+          <div className="min-w-0">
+            {header}
+            {description}
           </div>
-          {editing ? (
-            <textarea
-              autoFocus
-              defaultValue={scene.prompt}
-              onBlur={(e) => {
-                onChange({ ...scene, prompt: e.target.value });
-                setEditing(false);
-              }}
-              rows={5}
-              className="mt-3 w-full resize-none rounded-xl border border-border bg-background/60 p-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
-            />
-          ) : (
-            <p
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditing(true);
-              }}
-              className="mt-2 text-sm leading-relaxed text-muted-foreground hover:text-foreground"
-            >
-              {scene.prompt}
-            </p>
-          )}
         </div>
-      </div>
+      ) : (
+        <div className="flex items-start gap-4">
+          {thumb}
+          <div className="min-w-0 flex-1">
+            {header}
+            {description}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
