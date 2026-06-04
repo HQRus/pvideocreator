@@ -1167,6 +1167,7 @@ function StructurePanel({
   onSelect,
   totalDuration,
   onChatCommand,
+  studioMode,
 }: {
   projectId: string;
   meta: {
@@ -1187,6 +1188,7 @@ function StructurePanel({
   onSelect: (id: string) => void;
   totalDuration: number;
   onChatCommand?: (text: string) => void;
+  studioMode: StudioMode;
 }) {
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
