@@ -264,15 +264,3 @@ export const directGeneratePoll = createServerFn({ method: "POST" })
     };
   });
 
-// Legacy synchronous entrypoint (kept for any callers we missed). Holds
-// the request open the entire job, which fails on Workers for video jobs.
-// Prefer directGenerateStart + directGeneratePoll.
-const _UnusedSync = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => InputSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    void context;
-    void data;
-    throw new Error("directGenerate (sync) is deprecated — use directGenerateStart + directGeneratePoll");
-  });
-void _UnusedSync;
