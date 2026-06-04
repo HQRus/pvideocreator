@@ -22,7 +22,7 @@ import {
 // "Shots" still routes through the chat AI (it asks the director to fill in
 // any missing shot images via the generate_image tool).
 // "Render final video" runs the deterministic fal.ai pipeline — no LLM.
-import { renderFinalVideo } from "@/lib/render.functions";
+import { renderFinalVideo, listProjectRenders } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
@@ -43,6 +43,8 @@ import {
   Maximize2,
   FolderOpen,
   Loader2,
+  History,
+  RotateCw,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TimelinePanel } from "@/components/studio/timeline-panel";
@@ -1313,6 +1315,7 @@ function StructurePanel({
               { v: "cast", icon: Users, label: "Cast" },
               { v: "music", icon: Music2, label: "Audio" },
               { v: "timeline", icon: ListVideo, label: "Timeline" },
+              { v: "renders", icon: History, label: "Renders" },
             ].map(({ v, icon: Icon, label }) => (
               <TabsTrigger
                 key={v}
@@ -1463,6 +1466,15 @@ function StructurePanel({
             assets={assets}
           />
         </TabsContent>
+
+        <TabsContent value="renders" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
+          <RendersPanel
+            projectId={projectId}
+            activeJobId={renderJobId}
+            onRetry={onRenderFinal}
+            isRendering={rendering}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Floating sticky action bar */}
@@ -1510,6 +1522,146 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
         {icon}
       </div>
       <div className="max-w-[260px] text-base font-medium leading-relaxed text-muted-foreground">{text}</div>
+    </div>
+  );
+}
+
+// ---------- renders panel ----------
+
+function RendersPanel({
+  projectId,
+  activeJobId,
+  onRetry,
+  isRendering,
+}: {
+  projectId: string;
+  activeJobId: string | null;
+  onRetry: () => void;
+  isRendering: boolean;
+}) {
+  const fetchRenders = useServerFn(listProjectRenders);
+  const q = useQuery({
+    queryKey: ["project-renders", projectId],
+    queryFn: () => fetchRenders({ data: { projectId } }),
+    // Refetch while a job is active so progress updates.
+    refetchInterval: activeJobId ? 4_000 : false,
+  });
+  const queryClient = useQueryClient();
+
+  // Also refetch when the active job id flips (started / cleared).
+  useEffect(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ["project-renders", projectId],
+    });
+  }, [activeJobId, projectId, queryClient]);
+
+  const jobs = q.data?.jobs ?? [];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
+            Render queue
+          </div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {jobs.length === 0
+              ? "No renders yet."
+              : `${jobs.length} render${jobs.length === 1 ? "" : "s"}`}
+          </div>
+        </div>
+        <button
+          onClick={onRetry}
+          disabled={isRendering}
+          className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-4 py-2 text-sm font-bold text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
+        >
+          <RotateCw className="h-4 w-4" /> New render
+        </button>
+      </div>
+
+      {jobs.length === 0 && (
+        <EmptyHint
+          icon={<History className="h-8 w-8" />}
+          text="Final video renders will appear here. Each retry kicks off a fresh job."
+        />
+      )}
+
+      {jobs.map((job) => {
+        const isVideo = !!job.finalMime?.startsWith("video/");
+        const active =
+          job.status === "queued" || job.status === "running";
+        const failed = job.status === "failed";
+        const done = job.status === "done";
+        return (
+          <div
+            key={job.id}
+            className="rounded-2xl border border-border/60 bg-card/40 p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      done
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : failed
+                          ? "bg-destructive/15 text-destructive"
+                          : "bg-amber-500/15 text-amber-400"
+                    }`}
+                  >
+                    {active && (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    )}
+                    {job.status}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(job.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                {job.stepsTotal > 0 && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {job.stepsDone}/{job.stepsTotal} steps complete
+                  </div>
+                )}
+                {failed && job.error && (
+                  <div className="mt-2 line-clamp-3 text-xs text-destructive/90">
+                    {job.error}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={onRetry}
+                disabled={isRendering}
+                title="Kick off a new render"
+                className="inline-flex items-center gap-2 rounded-full bg-muted/60 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                <RotateCw className="h-3.5 w-3.5" /> Retry
+              </button>
+            </div>
+            {done && job.finalUrl && (
+              <div className="mt-3 overflow-hidden rounded-xl bg-background">
+                {isVideo ? (
+                  <video
+                    src={job.finalUrl}
+                    controls
+                    playsInline
+                    className="block max-h-[360px] w-full"
+                  />
+                ) : (
+                  <a
+                    href={job.finalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block p-3 text-xs underline"
+                  >
+                    Open output
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
