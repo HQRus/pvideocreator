@@ -353,7 +353,7 @@ function Studio() {
 
 // ---------- gallery rail (left, projects) ----------
 
-function FloatingGallery({
+const FloatingGallery = memo(function FloatingGallery({
   currentProjectId,
   currentTitle,
 }: {
