@@ -299,6 +299,9 @@ function Studio() {
             initialMessages={initialMessages}
             onPatch={handlePatch}
             assets={assets}
+            studioMode={studioMode}
+            studioModel={studioModel}
+            onToolbarChange={onToolbarChange}
             registerSender={(fn) => {
               chatSendRef.current = fn;
             }}
