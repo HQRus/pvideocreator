@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Bot, ChevronDown, Sparkles } from "lucide-react";
+import {
+  Bot,
+  ChevronDown,
+  Image as ImageIcon,
+  Mic as MicIcon,
+  Music as MusicIcon,
+  Sparkles,
+  Video as VideoIcon,
+} from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -12,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   SKILLS,
   SKILLS_BY_KIND,
@@ -21,6 +28,14 @@ import {
   type Skill,
   type StudioMode,
 } from "@/lib/skills";
+
+const MODE_ICON: Record<StudioMode, React.ComponentType<{ className?: string }>> = {
+  agent: Bot,
+  image: ImageIcon,
+  video: VideoIcon,
+  audio: MusicIcon,
+  speech: MicIcon,
+};
 
 export type StudioToolbarProps = {
   mode: StudioMode;
@@ -50,43 +65,38 @@ export function StudioToolbar({ mode, model, onChange }: StudioToolbarProps) {
     onChange({ mode: s.kind, model: s.model });
   };
 
+  const ModeIcon = MODE_ICON[mode];
+  const currentLabel = STUDIO_MODES.find((m) => m.id === mode)?.label ?? mode;
+
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-sm">
-      {/* Agent toggle */}
-      <label className="flex items-center gap-2 pr-2">
-        <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-medium text-muted-foreground">Agent</span>
-        <Switch
-          checked={agent}
-          onCheckedChange={(v) => setMode(v ? "agent" : "image")}
-          aria-label="Agent mode"
-        />
-      </label>
+      {/* Unified mode dropdown */}
+      <Select
+        value={mode}
+        onValueChange={(v) => setMode(v as StudioMode)}
+      >
+        <SelectTrigger className="h-8 w-auto min-w-[140px] rounded-full bg-muted/60 px-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <ModeIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="font-semibold">{currentLabel}</span>
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          {STUDIO_MODES.map((m) => {
+            const Icon = MODE_ICON[m.id];
+            return (
+              <SelectItem key={m.id} value={m.id} className="text-xs">
+                <div className="flex items-center gap-2">
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                  {m.label}
+                </div>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
 
-      <div className="h-5 w-px bg-border" />
-
-      {/* Mode segmented control */}
-      <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
-        {STUDIO_MODES.map((m) => {
-          const active = m.id === mode;
-          return (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setMode(m.id)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                active
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {m.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Model dropdown — only when non-agent */}
+      {/* Model dropdown — to the right of mode selector */}
       {!agent && kindModels.length > 0 && (
         <Select
           value={model ?? kindModels[0].model}
