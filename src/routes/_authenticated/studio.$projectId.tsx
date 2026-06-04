@@ -4,7 +4,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import symbolLogo from "@/assets/symbol.svg";
+
 import { buildAuthHeaders } from "@/lib/fetch-with-auth";
 import {
   getProject,
@@ -562,7 +562,6 @@ function StudioTopBar({
   return (
     <header className="pointer-events-none relative z-20 flex shrink-0 justify-center px-4 py-3">
       <div className="pointer-events-auto flex flex-col items-center gap-6 pt-6">
-        <img src={symbolLogo} alt="Symbol" className="h-[21px] w-auto brightness-0" />
         <div className="flex items-center gap-3.5 rounded-full bg-foreground px-6 py-2.5 shadow-elegant">
             <BrandMark className="h-7 w-7" />
           <div className="flex items-baseline gap-2.5 leading-tight">
