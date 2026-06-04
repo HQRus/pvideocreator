@@ -112,7 +112,8 @@ function Studio() {
   useEffect(() => {
     const p = projectQuery.data?.project;
     if (!p) return;
-    setStudioMode((p.studioMode as StudioMode) ?? "agent");
+    const mode = (p.studioMode as StudioMode | undefined) || "agent";
+    setStudioMode(mode);
     setStudioModel(p.studioModel ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectQuery.data?.project.id]);
