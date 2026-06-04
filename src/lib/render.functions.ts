@@ -493,7 +493,16 @@ export const renderFinalVideo = createServerFn({ method: "POST" })
 
     // Seed one output row per planned step. The tick endpoint picks them
     // up one at a time, in dependency order, without blocking this request.
-    const seeds: Array<Record<string, unknown>> = [];
+    type SeedRow = {
+      render_job_id: string;
+      scene_id: string;
+      scene_n: number;
+      kind: string;
+      status: string;
+      prompt: string | null;
+      model: string;
+    };
+    const seeds: SeedRow[] = [];
     for (const s of state.scenes) {
       if (!s.thumb) {
         seeds.push({
