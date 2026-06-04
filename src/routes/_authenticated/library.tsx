@@ -93,7 +93,7 @@ function LibraryPage() {
 
           <TabsContent value="generations" className="m-0">
             <AssetGrid
-              empty="No generations yet — head to Skills to make your first."
+              empty="No generations yet — head to Apps to make your first."
               items={data.generations}
             />
           </TabsContent>

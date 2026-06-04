@@ -16,6 +16,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthenticatedSkillsRouteImport } from './routes/_authenticated/skills'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedAppsRouteImport } from './routes/_authenticated/apps'
 import { Route as AuthenticatedStudioIndexRouteImport } from './routes/_authenticated/studio.index'
 import { Route as ApiPublicRenderTickRouteImport } from './routes/api/public/render-tick'
 import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
@@ -55,6 +56,11 @@ const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAppsRoute = AuthenticatedAppsRouteImport.update({
+  id: '/apps',
+  path: '/apps',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedStudioIndexRoute =
   AuthenticatedStudioIndexRouteImport.update({
     id: '/studio/',
@@ -81,6 +87,7 @@ const AuthenticatedStudioProjectIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/apps': typeof AuthenticatedAppsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/skills': typeof AuthenticatedSkillsRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/apps': typeof AuthenticatedAppsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/skills': typeof AuthenticatedSkillsRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/apps': typeof AuthenticatedAppsRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/skills': typeof AuthenticatedSkillsRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/apps'
     | '/library'
     | '/projects'
     | '/skills'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/apps'
     | '/library'
     | '/projects'
     | '/skills'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/apps'
     | '/_authenticated/library'
     | '/_authenticated/projects'
     | '/_authenticated/skills'
@@ -216,6 +228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/apps': {
+      id: '/_authenticated/apps'
+      path: '/apps'
+      fullPath: '/apps'
+      preLoaderRoute: typeof AuthenticatedAppsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/studio/': {
       id: '/_authenticated/studio/'
       path: '/studio'
@@ -248,6 +267,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAppsRoute: typeof AuthenticatedAppsRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSkillsRoute: typeof AuthenticatedSkillsRoute
@@ -256,6 +276,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAppsRoute: AuthenticatedAppsRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSkillsRoute: AuthenticatedSkillsRoute,
