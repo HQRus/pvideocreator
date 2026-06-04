@@ -4,7 +4,6 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { AccountPopover } from "@/components/account-popover";
 import { AppNav } from "@/components/app-nav";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -31,7 +30,6 @@ function AuthedLayout() {
       <div className="flex-1">
         <Outlet />
       </div>
-      <AccountPopover />
     </div>
   );
 }

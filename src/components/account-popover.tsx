@@ -59,56 +59,47 @@ export function AccountPopover() {
     .join("");
 
   return (
-    <div className="fixed bottom-4 left-4 z-50">
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="flex items-center gap-3 rounded-3xl bg-card px-3 py-2 pr-2 shadow-elegant backdrop-blur-xl transition hover:bg-card/80"
-          >
-            <Avatar className="h-9 w-9">
-              {user.avatar ? <AvatarImage src={user.avatar} alt="" /> : null}
-              <AvatarFallback>{initials || "U"}</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col items-start leading-tight">
-              <span className="text-sm font-medium text-foreground">
-                {user.name ?? user.email}
-              </span>
-              {user.email && (
-                <span className="text-xs text-muted-foreground">
-                  {user.email}
-                </span>
-              )}
-            </div>
-            <ChevronUp className="ml-2 h-4 w-4 text-muted-foreground" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          side="top"
-          align="start"
-          className="w-64 p-2"
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-2 rounded-full bg-card px-2.5 py-1.5 pr-3 shadow-sm border border-border/60 transition hover:bg-muted"
         >
-          <div className="px-2 py-2 border-b border-border mb-1">
-            <p className="text-sm font-medium truncate">
-              {user.name ?? "Account"}
+          <Avatar className="h-7 w-7">
+            {user.avatar ? <AvatarImage src={user.avatar} alt="" /> : null}
+            <AvatarFallback>{initials || "U"}</AvatarFallback>
+          </Avatar>
+          <span className="text-sm font-medium text-foreground hidden sm:block">
+            {user.name ?? user.email}
+          </span>
+          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="end"
+        className="w-64 p-2"
+      >
+        <div className="px-2 py-2 border-b border-border mb-1">
+          <p className="text-sm font-medium truncate">
+            {user.name ?? "Account"}
+          </p>
+          {user.email && (
+            <p className="text-xs text-muted-foreground truncate">
+              {user.email}
             </p>
-            {user.email && (
-              <p className="text-xs text-muted-foreground truncate">
-                {user.email}
-              </p>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 text-destructive hover:text-destructive"
-            disabled={busy !== null}
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4" />
-            {busy === "logout" ? "Logging out…" : "Log out"}
-          </Button>
-        </PopoverContent>
-      </Popover>
-    </div>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2 text-destructive hover:text-destructive"
+          disabled={busy !== null}
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          {busy === "logout" ? "Logging out…" : "Log out"}
+        </Button>
+      </PopoverContent>
+    </Popover>
   );
 }

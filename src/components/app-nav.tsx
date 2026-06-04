@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { BrandMark } from "@/components/pika-mark";
+import { AccountPopover } from "@/components/account-popover";
 
 const NAV_ITEMS = [
   { to: "/projects", label: "Projects" },
@@ -32,7 +33,7 @@ export function AppNav() {
             </Link>
           ))}
         </nav>
-        <div className="w-24" />
+        <AccountPopover />
       </div>
     </header>
   );
