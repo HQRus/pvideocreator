@@ -225,7 +225,7 @@ async function generateAndStoreKeyframe(opts: {
         projectId: opts.projectId,
         userId: opts.userId,
         sourceUrl: url,
-        kind: "reference",
+        kind: "keyframe",
         label: `Keyframe — ${opts.sceneTitle}`,
         fallbackMime: "image/png",
       });
@@ -240,7 +240,7 @@ async function generateAndStoreKeyframe(opts: {
   const stored = await storeAsset({
     projectId: opts.projectId,
     userId: opts.userId,
-    kind: "reference",
+    kind: "keyframe",
     mime,
     bytes: b64ToBytes(b64),
     label: `Keyframe — ${opts.sceneTitle}`,
