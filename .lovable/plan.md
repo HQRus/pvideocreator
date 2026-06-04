@@ -1,89 +1,72 @@
+## Goal
 
-# Problem
+1. Speak the user's mental model everywhere: **Shots**, not Keyframes / Scenes / Storyboard.
+2. Remove Pika MCP and run the whole generative pipeline through **fal.ai** with the user's API key.
+3. Make **"Render final video"** actually produce one final MP4 with music and voiceover stitched together — not stop at per-scene clips.
 
-Today the **Go to production** button assembles a long natural-language directive and posts it into the chat as a user message. The LLM then decides which `pika_*` MCP tool to call, in what order, with what arguments. Two bad consequences:
+## Phase 1 — Wire up fal.ai, retire Pika
 
-1. The directive is visible in the transcript (you saw it).
-2. Rendering reliability depends on the model: it can skip scenes, pass wrong args, hit step limits, time out, or paraphrase the motion prompt.
+### Secret
+- Ask the user via `add_secret` for `FAL_KEY`. All fal calls go through a single `src/lib/fal.server.ts` helper (`falRun(modelId, input)` that POSTs to `https://queue.fal.run/<model>` and polls until done — fal exposes a uniform queue API across models).
 
-Pika MCP is a deterministic API. There's no reason a human-language prompt should sit between the button and the render.
+### Remove Pika
+- Delete: `src/lib/pika-mcp.server.ts`, `src/routes/api/pika/*.ts`, the "Connect Pika" pill in `account-popover.tsx`, all `pika_*` tool wiring + prompt sections in `src/routes/api/chat.ts`, and all Pika branches in `src/lib/render.functions.ts`.
+- Keep `project_assets` / `render_jobs` / `render_scene_outputs` tables as-is — they're provider-agnostic.
 
-# Goal
+### Model choices (defaults — easy to swap later)
+| Step | Model |
+| --- | --- |
+| Shot images | `fal-ai/nano-banana` (with reference images for likeness) |
+| Animate shot | `fal-ai/kling-video/v2/master/image-to-video` (image+prompt → clip) |
+| Music bed | `fal-ai/cassetteai/music-generator` (duration = total film length) |
+| Voiceover | `fal-ai/elevenlabs/tts/multilingual-v2` per scene that has a `voPrompt` |
+| Stitching | `fal-ai/ffmpeg-api/compose` — concatenates clips, mixes music + VO, outputs one MP4 |
 
-Clicking **Go to production** runs a real server-side job:
-- iterate every scene missing `clipUrl`
-- call the right Pika MCP tool directly (no LLM)
-- stream per-scene status back to the panel
-- post one short assistant summary card in chat when done
+All five are real fal endpoints with the same queue contract, so a single helper handles them all.
 
-The chat stays for creative direction only.
+## Phase 2 — Real end-to-end "Render final video"
 
-# Plan
+Replace `startProduction` in `src/lib/render.functions.ts` with a single server fn `renderFinalVideo({ projectId })` that runs sequentially and writes progress into `render_jobs` / `render_scene_outputs` so the UI can show live status:
 
-## 1. New server function: `startProduction`
-File: `src/lib/production.functions.ts` (new), helpers in `src/lib/production.server.ts` (new).
-
-- Auth-protected `createServerFn` that takes `{ projectId }`.
-- Loads project state, picks scenes where `!clipUrl`.
-- Opens one Pika MCP client via existing `openPikaMCPClient(userId, redirectUri)`.
-- For each scene, picks the tool deterministically:
-  - `pika_generate_keyframes_video` if `scene.thumb` resolves to an asset URL
-  - else `pika_generate_video`
-- Builds args from `motionPrompt || prompt`, `duration`, aspect ratio, keyframe URL.
-- Submits jobs in parallel (bounded concurrency, e.g. 3).
-- Persists job rows in a new `production_jobs` table (`project_id`, `scene_id`, `pika_task_id`, `status`, `clip_url`, `error`, timestamps).
-- Returns `{ jobs: [...] }` immediately — does not block on render.
-
-## 2. Polling endpoint: `getProductionStatus`
-Same file. Takes `{ projectId }`, returns current job rows + which scenes now have `clipUrl`. Internally:
-- For any job still `processing`, calls the Pika status tool.
-- When complete, downloads the clip into project storage (reuse `project-assets.server.ts` durable-storage flow already used in `chat.ts`'s `onFinish`).
-- Patches `scenes[i].clipUrl` + `scenes[i].status = "ready"` in project state.
-- Marks job row `done` / `failed`.
-
-## 3. Replace the chat directive with a real button flow
-File: `src/routes/_authenticated/studio.$projectId.tsx` (~line 1188, 1391).
-
-- Delete the directive string assembly and the `sendMessage` injection.
-- `Go to production` now calls `startProduction`, then starts a `useQuery` poll on `getProductionStatus` every ~5s until all jobs settle.
-- Show per-scene progress in the existing Storyboard/Scenes tiles (`status: "rendering" | "ready" | "failed"`).
-- When all jobs finish, append **one** short assistant message to the chat thread (server-stored, not a synthetic user turn) with the recap — e.g. "Rendered 4 / 5 scenes. Scene 3 failed: <reason>."
-
-## 4. Remove the prompt-based path from chat
-File: `src/routes/api/chat.ts`.
-
-- Drop the "Go to production" section (~line 403-410) from the system prompt.
-- Keep `pika_*` MCP tools available to the chat for ad-hoc one-off scene renders the user requests in conversation, but production = server job, not chat.
-
-## 5. Pika disconnected case
-If the user has no Pika connection, `startProduction` returns `{ error: "pika_not_connected" }` and the button surfaces the existing "Connect Pika" UI inline. No chat message needed.
-
-## 6. Database
-New migration:
-```sql
-create table public.production_jobs (
-  id uuid primary key default gen_random_uuid(),
-  project_id uuid not null,
-  scene_id text not null,
-  pika_task_id text,
-  status text not null default 'queued', -- queued|processing|done|failed
-  clip_url text,
-  error text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+```text
+1. Ensure shot images   → fal nano-banana for any shot missing `thumb`
+2. Animate shots        → kling i2v per shot, store as `clipUrl`
+3. Generate music       → one track sized to total duration, store as music asset
+4. Generate voiceover   → per-shot TTS if shot has VO text, store per-shot
+5. Stitch               → fal ffmpeg-api/compose: concat clips, overlay VO at shot offsets, mix music underneath
+6. Save final           → store stitched MP4 as `kind: "video"` asset, link to render_jobs.final_asset_id
 ```
-+ grants + RLS scoped to the project owner.
 
-# Technical notes
+Steps 1–4 already have per-scene rows in `render_scene_outputs` (one per `kind`), so the existing realtime UI just needs to render rows for `kind` of `keyframe`, `clip`, `voiceover`, plus a single `music` and `final` row.
 
-- Pika clip downloads + storage already work in `chat.ts onFinish` — extract that into a shared helper in `production.server.ts` and call it from both places.
-- Concurrency cap avoids hammering Pika; jobs that fail individually don't fail the batch.
-- The chat thread no longer contains the directive at all — nothing to hide because nothing is sent.
-- Future: swap polling for Supabase Realtime on `production_jobs` if latency becomes an issue.
+Failure handling: any failed shot leaves its row `failed` with an error message; user can retry that one row (existing `retryRenderScene` pattern extended to all kinds). The stitch step only runs if all clips are present.
 
-# Out of scope
+## Phase 3 — Rename pass (Shots everywhere)
 
-- Reorganizing the Storyboard/Scenes UI beyond surfacing per-scene render state.
-- Changing how keyframes are generated (still chat-driven for now).
-- Migrating other chat directives — only "Go to production" moves to a server job in this change.
+In `src/routes/_authenticated/studio.$projectId.tsx`:
+- Top button: `Keyframes · {n}` → **`Shots · {n}`**, tooltip "X shots missing an image", handler still calls `startRender`.
+- Big button: `Go to production` → **`Render final video`**, tooltip "X shots not yet animated" + "music & voiceover will be generated", handler calls the new `renderFinalVideo`.
+- Internal copy: "Generate frames" → "Generate shot images"; "Animate shots" stays; "scene" copy → "shot" wherever it's user-visible. `Scene` TypeScript type stays (no data migration).
+
+Also add an optional `voPrompt?: string` field to `Scene` and a small textarea in the Shot row labeled "Voiceover (optional)" so step 4 has something to read.
+
+## Phase 4 — Cleanup chat agent
+
+In `src/routes/api/chat.ts`:
+- Drop the `pika_*` dynamic tool injection and the whole "Pika tools available" prompt section.
+- Replace with two simple fal-backed tools the chat agent can call when the user asks conversationally: `generate_shot_image(sceneId, prompt)` and `animate_shot(sceneId)`. Both reuse the same fal helper as the deterministic pipeline.
+- Update prompt copy so the agent talks in "shots" too.
+
+## Technical notes
+
+- `src/lib/fal.server.ts`: thin wrapper using `fetch` against `https://queue.fal.run/<model>` with `Authorization: Key ${FAL_KEY}`. Submits, polls `/requests/<id>/status`, fetches `/requests/<id>` when done, returns the JSON result. No `@fal-ai/serverless-client` dependency needed — keeps the bundle small and Worker-safe.
+- All generated media still flows through `downloadAndStoreUrl()` → Supabase storage, so URLs stay stable and CORS-safe regardless of fal's CDN.
+- Realtime: continue using the existing `render_jobs` / `render_scene_outputs` Supabase Realtime subscription in the studio — just new `kind` values.
+- Aspect ratio: fal video models accept aspect strings matching what we already store in `state.meta.aspectRatio`.
+- The render runs inside one server fn handler; for a long pipeline this should be fine for typical 6–10 shot projects but, if we hit Worker time limits, the natural next step is to make each phase its own server fn invoked by the client in sequence — call out if/when that becomes necessary.
+
+## Out of scope (call out, don't build)
+
+- Style/character consistency across shots beyond what nano-banana + reference images give us — can layer LoRA / IP-Adapter later.
+- Beat-synced music (we just length-match the bed).
+- In-browser final-video editor — once the stitched MP4 exists, the Timeline panel just plays it.
