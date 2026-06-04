@@ -368,10 +368,12 @@ Patch schema (every field optional, omit what you're not changing):
     "fps": string,
     "resolution": string
   },
-  "scenes": [ { "n": number, "title": string, "prompt": string, "motionPrompt": string, "duration": number, "thumb": string, "clipUrl": string } ],
+  "scenes": [ { "id": string?, "n": number, "title": string, "prompt": string, "motionPrompt": string, "voPrompt": string, "duration": number, "thumb": string, "clipUrl": string } ],
   "scenesAppend": [ ...same shape, appended to existing scenes ],
-  "cast": [ { "name": string, "role": string, "notes": string } ],
+  "scenesReplace": [ ...destructive full rewrite, use sparingly ],
+  "cast": [ { "id": string?, "name": string, "role": string, "notes": string } ],
   "castAppend": [ ...same shape ],
+  "castReplace": [ ...destructive full rewrite ],
   "music": { "title": string, "artist": string, "bpm": number, "key": string, "duration": number }
 }
 
