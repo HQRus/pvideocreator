@@ -116,9 +116,44 @@ export function TimelinePanel({
 
   // --- Playback (chain clipUrls) ---
   const playable = scenes.filter((s) => s.clipUrl);
-  const canPlay = playable.length > 0;
+  const hasClips = playable.length > 0;
+  const canPlay = scenes.length > 0; // animatic preview works without clips
+
+  // Animatic playback: when no rendered clips exist, advance the playhead via rAF
+  // so the scrubber moves and the keyframe preview switches scenes in realtime.
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || hasClips) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setPlayhead((p) => {
+        const next = p + dt;
+        if (next >= totalDuration) {
+          setPlaying(false);
+          return totalDuration;
+        }
+        // keep active scene in sync with playhead
+        let acc = 0;
+        for (const s of scenes) {
+          const end = acc + (s.duration || 0);
+          if (next >= acc && next < end) {
+            if (s.id !== activeSceneId) onSelect(s.id);
+            break;
+          }
+          acc = end;
+        }
+        return next;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, hasClips, totalDuration, scenes, activeSceneId, onSelect]);
+
+  useEffect(() => {
+    if (!playing || !hasClips) return;
     const v = videoRef.current;
     if (!v) return;
     const scene = playable[playIdx];
@@ -148,7 +183,7 @@ export function TimelinePanel({
       v.removeEventListener("ended", onEnd);
       v.pause();
     };
-  }, [playing, playIdx, playable, scenes]);
+  }, [playing, hasClips, playIdx, playable, scenes]);
 
   const togglePlay = () => {
     if (!canPlay) return;
@@ -157,7 +192,7 @@ export function TimelinePanel({
       videoRef.current?.pause();
     } else {
       setPlayIdx(0);
-      setPlayhead(0);
+      if (playhead >= totalDuration - 0.05) setPlayhead(0);
       setPlaying(true);
     }
   };
@@ -206,7 +241,13 @@ export function TimelinePanel({
               "flex h-9 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-bold text-background transition-opacity",
               !canPlay && "opacity-40",
             )}
-            title={canPlay ? "Play stitched preview" : "Render clips first to enable playback"}
+            title={
+              !canPlay
+                ? "Add scenes to enable playback"
+                : hasClips
+                  ? "Play stitched preview"
+                  : "Play animatic (keyframes)"
+            }
           >
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {playing ? "Pause" : "Play"}
@@ -214,9 +255,9 @@ export function TimelinePanel({
           <span className="ml-2 font-mono text-sm tabular-nums text-muted-foreground">
             {fmt(playhead)} / {fmt(totalDuration)}
           </span>
-          {!canPlay && (
+          {canPlay && !hasClips && (
             <span className="text-xs text-muted-foreground">
-              · render scenes to preview
+              · animatic preview (render clips for video)
             </span>
           )}
         </div>
@@ -242,7 +283,7 @@ export function TimelinePanel({
 
       {/* Large preview — compact so timeline stays visible */}
       <div className="flex h-48 min-h-0 items-center justify-center overflow-hidden border-b border-border/40 bg-black">
-        {canPlay ? (
+        {hasClips ? (
           <video
             ref={videoRef}
             className="max-h-full max-w-full"
