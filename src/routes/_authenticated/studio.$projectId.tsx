@@ -632,6 +632,7 @@ function ChatPanel({
   assets,
   studioMode,
   projectMode,
+  skill,
   studioModel,
   onToolbarChange,
   registerSender,
@@ -642,6 +643,7 @@ function ChatPanel({
   assets: ProjectAsset[];
   studioMode: StudioMode;
   projectMode: StudioMode;
+  skill: Skill | null;
   studioModel: string | null;
   onToolbarChange: (next: { mode: StudioMode; model: string | null }) => void;
   registerSender?: (fn: (text: string) => void) => void;
