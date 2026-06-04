@@ -1504,6 +1504,7 @@ function StructurePanel({
       </Tabs>
 
       {/* Floating sticky action bar */}
+      {studioMode === "agent" && (
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
           <button
@@ -1537,6 +1538,7 @@ function StructurePanel({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
