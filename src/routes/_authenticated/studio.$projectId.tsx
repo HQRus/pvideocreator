@@ -625,6 +625,96 @@ const STARTERS = [
   "TikTok hook — fashion",
 ];
 
+// ---------- "How it works" panel for App projects ----------
+
+function HowItWorks({ skill, mode }: { skill: Skill | null; mode: StudioMode }) {
+  const steps = getSteps(skill, mode);
+  const Icon = skill?.icon ?? Sparkles;
+  return (
+    <div className="flex flex-col items-center gap-10 pt-8 pb-2 text-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/30">
+          <Icon className="h-8 w-8 text-primary" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
+            How it works
+          </h1>
+          {skill?.description && (
+            <p className="max-w-xl text-base text-muted-foreground">
+              {skill.description}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex w-full max-w-2xl items-stretch justify-center gap-3">
+        {steps.map((s, i) => (
+          <Fragment key={s.title}>
+            <div className="flex flex-1 flex-col items-center gap-3 rounded-2xl border border-border bg-card px-4 py-6">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-muted text-foreground">
+                <s.icon className="h-6 w-6" />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Step {i + 1}
+                </div>
+                <div className="text-sm font-semibold">{s.title}</div>
+                <div className="text-xs text-muted-foreground">{s.body}</div>
+              </div>
+            </div>
+            {i < steps.length - 1 && (
+              <div className="flex items-center text-muted-foreground">
+                <ArrowRight className="h-5 w-5" />
+              </div>
+            )}
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getSteps(
+  skill: Skill | null,
+  mode: StudioMode,
+): { title: string; body: string; icon: typeof Sparkles }[] {
+  const isEdit = !!skill?.model?.includes("/edit");
+  const kind = skill?.kind ?? (mode === "agent" ? "image" : (mode as Exclude<StudioMode, "agent">));
+  if (isEdit) {
+    return [
+      { title: "Attach an image", body: "Drop in the source photo to transform.", icon: Upload },
+      { title: "Describe the change", body: "Tell the model what to do in plain language.", icon: Wand2 },
+      { title: "Get your result", body: "It lands in the gallery — generate as many as you like.", icon: Download },
+    ];
+  }
+  if (kind === "video") {
+    return [
+      { title: "Write a prompt", body: "Describe the shot, motion, and mood.", icon: Wand2 },
+      { title: "Render", body: "The model animates it into a clip.", icon: Sparkles },
+      { title: "Watch & download", body: "Find finished videos in the gallery.", icon: Download },
+    ];
+  }
+  if (kind === "audio") {
+    return [
+      { title: "Describe the vibe", body: "Genre, tempo, instruments, mood.", icon: Wand2 },
+      { title: "Compose", body: "The model writes a fresh track from scratch.", icon: Sparkles },
+      { title: "Listen", body: "Audio appears in the gallery to play & download.", icon: Download },
+    ];
+  }
+  if (kind === "speech") {
+    return [
+      { title: "Write a script", body: "Paste the text you want spoken.", icon: Wand2 },
+      { title: "Generate voice", body: "The model speaks it in a natural voice.", icon: Sparkles },
+      { title: "Download audio", body: "Your voiceover lands in the gallery.", icon: Download },
+    ];
+  }
+  return [
+    { title: "Write a prompt", body: "Describe the image you want.", icon: Wand2 },
+    { title: "Generate", body: "The model renders it from your words.", icon: Sparkles },
+    { title: "Get your image", body: "It lands in the gallery — keep going!", icon: Download },
+  ];
+}
+
 function ChatPanel({
   projectId,
   initialMessages,
