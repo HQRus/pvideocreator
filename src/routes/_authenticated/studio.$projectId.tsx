@@ -1585,15 +1585,23 @@ function TechSpecs({
 function SceneRow({
   scene,
   active,
+  aspectRatio,
   onClick,
   onChange,
 }: {
   scene: Scene;
   active: boolean;
+  aspectRatio?: string;
   onClick: () => void;
   onChange: (s: Scene) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  // Parse "W:H" → aspect-ratio CSS value. Default to 16:9 if missing/invalid.
+  const ar = (() => {
+    const m = (aspectRatio || "").match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+    if (!m) return "16 / 9";
+    return `${m[1]} / ${m[2]}`;
+  })();
   return (
     <div
       onClick={onClick}
@@ -1601,19 +1609,24 @@ function SceneRow({
         active ? "border-primary/60 shadow-glow" : "border-border/60 hover:border-foreground/30"
       }`}
     >
-      <div className="flex gap-4">
+      <div className="flex items-start gap-4">
         <GripVertical className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50" />
-        {scene.thumb ? (
-          <img
-            src={scene.thumb}
-            alt=""
-            className="h-20 w-14 shrink-0 rounded-xl object-cover"
-          />
-        ) : (
-          <div className="grid h-20 w-14 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground/50">
-            <Film className="h-5 w-5" />
-          </div>
-        )}
+        <div
+          className="w-72 shrink-0 overflow-hidden rounded-xl bg-muted"
+          style={{ aspectRatio: ar }}
+        >
+          {scene.thumb ? (
+            <img
+              src={scene.thumb}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center text-muted-foreground/50">
+              <Film className="h-7 w-7" />
+            </div>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -1632,7 +1645,7 @@ function SceneRow({
                 onChange({ ...scene, prompt: e.target.value });
                 setEditing(false);
               }}
-              rows={3}
+              rows={5}
               className="mt-3 w-full resize-none rounded-xl border border-border bg-background/60 p-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
             />
           ) : (
@@ -1641,7 +1654,7 @@ function SceneRow({
                 e.stopPropagation();
                 setEditing(true);
               }}
-              className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground hover:text-foreground"
+              className="mt-2 text-sm leading-relaxed text-muted-foreground hover:text-foreground"
             >
               {scene.prompt}
             </p>
