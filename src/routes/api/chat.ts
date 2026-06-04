@@ -368,10 +368,12 @@ Patch schema (every field optional, omit what you're not changing):
     "fps": string,
     "resolution": string
   },
-  "scenes": [ { "n": number, "title": string, "prompt": string, "motionPrompt": string, "duration": number, "thumb": string, "clipUrl": string } ],
+  "scenes": [ { "id": string?, "n": number, "title": string, "prompt": string, "motionPrompt": string, "voPrompt": string, "duration": number, "thumb": string, "clipUrl": string } ],
   "scenesAppend": [ ...same shape, appended to existing scenes ],
-  "cast": [ { "name": string, "role": string, "notes": string } ],
+  "scenesReplace": [ ...destructive full rewrite, use sparingly ],
+  "cast": [ { "id": string?, "name": string, "role": string, "notes": string } ],
   "castAppend": [ ...same shape ],
+  "castReplace": [ ...destructive full rewrite ],
   "music": { "title": string, "artist": string, "bpm": number, "key": string, "duration": number }
 }
 
@@ -412,23 +414,25 @@ The Project panel must never sit empty after the user has given a concept.
 - When the user approves the shot list (or asks for shot images), call
   generate_image once per shot with a vivid prompt that bakes in the
   logline + scene.prompt + character description + a consistent style note.
-  You MUST pass kind="keyframe" for shot images so they don't pollute the
-  References strip, and a label like "Shot 3: <title>". Then in the SAME
-  turn, emit a project-patch that sets each matching scene.thumb to the
-  returned asset URL and scene.status = "ready". Never leave a generated
-  shot image dangling as a reference with no scene link.
+  You MUST pass sceneId="<that scene's id>" so the runtime tags the asset
+  as a keyframe AND auto-links it to scene.thumb / scene.status="ready" for
+  you. Also pass a label like "Shot 3: <title>". If you do not have a
+  scene id (e.g. mood image, character study), pass kind="keyframe" only
+  when it's literally a shot frame — otherwise leave kind unset
+  (defaults to "reference") so it appears in the References strip.
 - Animating shots, generating music, generating voiceover, and stitching the
   final MP4 are handled by the "Render final video" button in the Project
   panel — it runs a deterministic fal.ai pipeline, not chat. You do not need
   to (and cannot) call video, music, or stitch tools from chat.
 
 Rules for patches:
-- "scenes" REPLACES the full scenes array, "cast" REPLACES the full cast
-  array. If you send "scenes": [...] with only 3 entries, the other shots
-  are DELETED. To update a few shots while preserving the rest, send the
-  FULL current scenes array with your edits merged in — never a partial
-  list. To add brand-new shots, use "scenesAppend". Same rule for cast /
-  castAppend.
+- "scenes": [...] now MERGES by id when every entry carries an existing
+  scene id — so it's safe to send just the shot you edited (e.g.
+  { "scenes": [{ "id": "s1010", "title": "New title" }] }) and the rest
+  stay intact. To ADD brand-new shots use "scenesAppend". To DESTRUCTIVELY
+  replace the whole list (rare — only when restructuring), use
+  "scenesReplace". Same rules for cast / castAppend / castReplace and
+  assets / assetsAppend / assetsReplace.
 - Patch eagerly. Partial is fine — one field is better than zero. Don't wait
   until a section is "complete" before committing it.
 - Never invent specifics the user hasn't agreed to (real artist names,
@@ -571,7 +575,7 @@ export const Route = createFileRoute("/api/chat")({
         const tools: Record<string, unknown> = {
           generate_image: tool({
             description:
-              "Generate a single reference image (mood, character, scene, logo). Returns an asset descriptor already attached to project state.",
+              "Generate a single image (mood, character, shot keyframe, logo). Returns an asset descriptor already attached to project state. Pass sceneId when generating an image FOR a specific shot — it will be stored as a keyframe and auto-linked to that shot's thumb.",
             inputSchema: z.object({
               prompt: z.string().min(3).max(800),
               kind: z
@@ -587,11 +591,19 @@ export const Route = createFileRoute("/api/chat")({
                 ])
                 .optional(),
               label: z.string().max(120).optional(),
+              sceneId: z.string().min(1).max(120).optional(),
               referenceAssetIds: z.array(z.string().min(1).max(120)).max(8).optional(),
               referenceImageUrls: z.array(z.string().url()).max(8).optional(),
             }),
-            execute: async ({ prompt, kind, label, referenceAssetIds, referenceImageUrls }) => {
+            execute: async ({ prompt, kind, label, sceneId, referenceAssetIds, referenceImageUrls }) => {
               try {
+                // When the agent is generating an image FOR a specific shot,
+                // force kind=keyframe so it stays out of the References strip,
+                // and we'll auto-patch scene.thumb/status below.
+                const matchedScene = sceneId
+                  ? projectState.scenes.find((s) => s.id === sceneId)
+                  : undefined;
+                const effectiveKind = matchedScene ? "keyframe" : (kind ?? "reference");
                 const resolvedReferenceUrls = Array.from(
                   new Set([
                     ...(referenceAssetIds ?? []).map((id) => assetUrlById.get(id) ?? ""),
@@ -613,17 +625,27 @@ export const Route = createFileRoute("/api/chat")({
                     projectId,
                     userId,
                     sourceUrl,
-                    kind: kind ?? "reference",
+                    kind: effectiveKind,
                     label,
                     fallbackMime: "image/png",
                   });
                   return {
                     id: stored.id,
-                    kind: kind ?? "reference",
+                    kind: effectiveKind,
                     mime: stored.mime,
                     name: (label ?? prompt.slice(0, 40)) + ".png",
                     url: stored.url,
                     label,
+                    // If wired to a shot, ship a partial scenes patch so the
+                    // client commits scene.thumb + status without relying on
+                    // the agent emitting a second JSON patch.
+                    patch: matchedScene
+                      ? {
+                          scenes: [
+                            { id: matchedScene.id, thumb: stored.url, status: "ready" },
+                          ],
+                        }
+                      : undefined,
                   };
                 } catch (e) {
                   console.error("[chat] downloadAndStoreUrl failed:", e);
