@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -18,6 +18,8 @@ import { StudioToolbar } from "@/components/studio/studio-toolbar";
 import {
   DEFAULT_MODEL_BY_KIND,
   type StudioMode,
+  SKILL_BY_ID,
+  type Skill,
 } from "@/lib/skills";
 // "Shots" still routes through the chat AI (it asks the director to fill in
 // any missing shot images via the generate_image tool).
@@ -45,6 +47,9 @@ import {
   Loader2,
   History,
   RotateCw,
+  ArrowRight,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TimelinePanel } from "@/components/studio/timeline-panel";
@@ -292,6 +297,10 @@ function Studio() {
           meta={meta}
           duration={totalDuration}
           sceneCount={scenes.length}
+          isAgent={
+            ((projectQuery.data?.project.studioMode as StudioMode | undefined) ||
+              "agent") === "agent"
+          }
           panelOpen={panelOpen}
           canTogglePanel={hasPanelContent}
           onTogglePanel={() => setUserPanelPref(!panelOpen)}
@@ -306,6 +315,11 @@ function Studio() {
             projectMode={
               (projectQuery.data?.project.studioMode as StudioMode | undefined) ||
               "agent"
+            }
+            skill={
+              (projectQuery.data?.project.skill &&
+                SKILL_BY_ID[projectQuery.data.project.skill]) ||
+              null
             }
             studioModel={studioModel}
             onToolbarChange={onToolbarChange}
@@ -555,6 +569,7 @@ function StudioTopBar({
   meta,
   duration,
   sceneCount,
+  isAgent,
   panelOpen,
   canTogglePanel,
   onTogglePanel,
@@ -562,6 +577,7 @@ function StudioTopBar({
   meta: { title: string; format: string; aspectRatio: string };
   duration: number;
   sceneCount: number;
+  isAgent: boolean;
   panelOpen: boolean;
   canTogglePanel: boolean;
   onTogglePanel: () => void;
@@ -573,9 +589,11 @@ function StudioTopBar({
             <BrandMark className="h-7 w-7" />
           <div className="flex items-baseline gap-2.5 leading-tight">
             <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
-            <span className="text-xs text-background/60">
-              {meta.format} · {meta.aspectRatio} · {sceneCount} shots · {formatDuration(duration)}
-            </span>
+            {isAgent && (
+              <span className="text-xs text-background/60">
+                {meta.format} · {meta.aspectRatio} · {sceneCount} shots · {formatDuration(duration)}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -607,6 +625,96 @@ const STARTERS = [
   "TikTok hook — fashion",
 ];
 
+// ---------- "How it works" panel for App projects ----------
+
+function HowItWorks({ skill, mode }: { skill: Skill | null; mode: StudioMode }) {
+  const steps = getSteps(skill, mode);
+  const Icon = skill?.icon ?? Sparkles;
+  return (
+    <div className="flex flex-col items-center gap-10 pt-8 pb-2 text-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/30">
+          <Icon className="h-8 w-8 text-primary" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
+            How it works
+          </h1>
+          {skill?.description && (
+            <p className="max-w-xl text-base text-muted-foreground">
+              {skill.description}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex w-full max-w-2xl items-stretch justify-center gap-3">
+        {steps.map((s, i) => (
+          <Fragment key={s.title}>
+            <div className="flex flex-1 flex-col items-center gap-3 rounded-2xl border border-border bg-card px-4 py-6">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-muted text-foreground">
+                <s.icon className="h-6 w-6" />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Step {i + 1}
+                </div>
+                <div className="text-sm font-semibold">{s.title}</div>
+                <div className="text-xs text-muted-foreground">{s.body}</div>
+              </div>
+            </div>
+            {i < steps.length - 1 && (
+              <div className="flex items-center text-muted-foreground">
+                <ArrowRight className="h-5 w-5" />
+              </div>
+            )}
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getSteps(
+  skill: Skill | null,
+  mode: StudioMode,
+): { title: string; body: string; icon: typeof Sparkles }[] {
+  const isEdit = !!skill?.model?.includes("/edit");
+  const kind = skill?.kind ?? (mode === "agent" ? "image" : (mode as Exclude<StudioMode, "agent">));
+  if (isEdit) {
+    return [
+      { title: "Attach an image", body: "Drop in the source photo to transform.", icon: Upload },
+      { title: "Describe the change", body: "Tell the model what to do in plain language.", icon: Wand2 },
+      { title: "Get your result", body: "It lands in the gallery — generate as many as you like.", icon: Download },
+    ];
+  }
+  if (kind === "video") {
+    return [
+      { title: "Write a prompt", body: "Describe the shot, motion, and mood.", icon: Wand2 },
+      { title: "Render", body: "The model animates it into a clip.", icon: Sparkles },
+      { title: "Watch & download", body: "Find finished videos in the gallery.", icon: Download },
+    ];
+  }
+  if (kind === "audio") {
+    return [
+      { title: "Describe the vibe", body: "Genre, tempo, instruments, mood.", icon: Wand2 },
+      { title: "Compose", body: "The model writes a fresh track from scratch.", icon: Sparkles },
+      { title: "Listen", body: "Audio appears in the gallery to play & download.", icon: Download },
+    ];
+  }
+  if (kind === "speech") {
+    return [
+      { title: "Write a script", body: "Paste the text you want spoken.", icon: Wand2 },
+      { title: "Generate voice", body: "The model speaks it in a natural voice.", icon: Sparkles },
+      { title: "Download audio", body: "Your voiceover lands in the gallery.", icon: Download },
+    ];
+  }
+  return [
+    { title: "Write a prompt", body: "Describe the image you want.", icon: Wand2 },
+    { title: "Generate", body: "The model renders it from your words.", icon: Sparkles },
+    { title: "Get your image", body: "It lands in the gallery — keep going!", icon: Download },
+  ];
+}
+
 function ChatPanel({
   projectId,
   initialMessages,
@@ -614,6 +722,7 @@ function ChatPanel({
   assets,
   studioMode,
   projectMode,
+  skill,
   studioModel,
   onToolbarChange,
   registerSender,
@@ -624,6 +733,7 @@ function ChatPanel({
   assets: ProjectAsset[];
   studioMode: StudioMode;
   projectMode: StudioMode;
+  skill: Skill | null;
   studioModel: string | null;
   onToolbarChange: (next: { mode: StudioMode; model: string | null }) => void;
   registerSender?: (fn: (text: string) => void) => void;
@@ -868,10 +978,14 @@ function ChatPanel({
     <div className="relative flex h-full flex-col">
       <Conversation className="flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-8 py-12">
-          <div className="flex flex-col items-start gap-6 pt-6">
-            <BrandMark className="h-12 w-12" />
-            <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
-          </div>
+          {projectMode === "agent" ? (
+            <div className="flex flex-col items-start gap-6 pt-6">
+              <BrandMark className="h-12 w-12" />
+              <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
+            </div>
+          ) : history.length === 0 && !activeCard && !busy ? (
+            <HowItWorks skill={skill} mode={projectMode} />
+          ) : null}
           {history.map((it) =>
             it.kind === "user" ? (
               <UserBubble key={it.key} text={it.text} assets={assets} />
