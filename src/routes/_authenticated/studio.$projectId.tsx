@@ -698,7 +698,7 @@ const STARTERS = [
   "TikTok hook — fashion",
 ];
 
-function ChatPanel({
+const ChatPanel = memo(function ChatPanel({
   projectId,
   initialMessages,
   onPatch,
