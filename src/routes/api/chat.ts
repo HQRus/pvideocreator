@@ -8,9 +8,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
-import { putAsset, base64ToBytes } from "@/lib/asset-cache.server";
 import {
-  storeAsset,
   downloadAndStoreUrl,
 } from "@/lib/project-assets.server";
 import { falGenerateImage } from "@/lib/fal.server";
