@@ -1315,6 +1315,7 @@ function StructurePanel({
               { v: "cast", icon: Users, label: "Cast" },
               { v: "music", icon: Music2, label: "Audio" },
               { v: "timeline", icon: ListVideo, label: "Timeline" },
+              { v: "renders", icon: History, label: "Renders" },
             ].map(({ v, icon: Icon, label }) => (
               <TabsTrigger
                 key={v}
