@@ -118,13 +118,18 @@ function Studio() {
     }
   }, [projectQuery.data?.project.id]);
 
-  const initialMessages: UIMessage[] = (projectQuery.data?.messages ?? []).map(
-    (m) => ({
-      id: m.id,
-      role: m.role,
-      parts: (Array.isArray(m.parts) ? m.parts : []) as UIMessage["parts"],
-    }),
-  ) as UIMessage[];
+  // Stable reference — useChat only consumes this on init; recomputing it
+  // every render forced ChatPanel to re-render on unrelated state changes
+  // (e.g. clicking a scene tile).
+  const initialMessages: UIMessage[] = useMemo(
+    () =>
+      ((projectQuery.data?.messages ?? []).map((m) => ({
+        id: m.id,
+        role: m.role,
+        parts: (Array.isArray(m.parts) ? m.parts : []) as UIMessage["parts"],
+      })) as UIMessage[]),
+    [projectQuery.data?.project.id],
+  );
 
   const [activeSceneId, setActiveSceneId] = useState<string>(
     INITIAL_PROJECT.scenes[0]?.id ?? "",
@@ -217,7 +222,7 @@ function Studio() {
     };
   }, [projectId, gate]);
 
-  const handlePatch = (patch: ProjectPatch) => {
+  const handlePatch = useCallback((patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
     // Optimistically bump this project to the top of the panel right away.
     queryClient.setQueryData<{ projects: Array<{ id: string; updatedAt: string }> }>(
@@ -236,15 +241,28 @@ function Studio() {
     void updateState({ data: { id: projectId, patch } }).then(() => {
       void queryClient.invalidateQueries({ queryKey: ["projects-list"] });
     });
-  };
+  }, [projectId, queryClient, updateState]);
 
   // The Render / Production buttons live in the right-hand StructurePanel
   // but need to dispatch into the chat (which owns the AI SDK session).
   // We expose a ref the ChatPanel registers its sender into.
   const chatSendRef = useRef<((text: string) => void) | null>(null);
 
-  const setScenes = (next: Scene[]) =>
-    setProject((prev) => ({ ...prev, scenes: next }));
+  const setScenes = useCallback(
+    (next: Scene[]) => setProject((prev) => ({ ...prev, scenes: next })),
+    [],
+  );
+
+  const registerSender = useCallback((fn: (text: string) => void) => {
+    chatSendRef.current = fn;
+  }, []);
+  const onChatCommand = useCallback((text: string) => {
+    chatSendRef.current?.(text);
+  }, []);
+  const onTogglePanel = useCallback(
+    () => setUserPanelPref((prev) => !(hasPanelContent && (prev ?? true))),
+    [hasPanelContent],
+  );
 
   if (gate !== "ready" || projectQuery.isLoading) {
     return (
