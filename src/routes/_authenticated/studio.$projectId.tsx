@@ -1462,28 +1462,28 @@ function StructurePanel({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
           <button
-            onClick={onGenerateKeyframes}
+            onClick={onGenerateShotImages}
             disabled={rendering}
             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-sm font-bold tracking-tight text-foreground transition hover:bg-muted disabled:opacity-60"
             title={
-              missingKeyframes > 0
-                ? `${missingKeyframes} scene${missingKeyframes === 1 ? "" : "s"} missing a keyframe`
-                : "All scenes have keyframes"
+              missingShotImages > 0
+                ? `${missingShotImages} shot${missingShotImages === 1 ? "" : "s"} missing an image`
+                : "All shots have images"
             }
           >
-            Keyframes{missingKeyframes > 0 ? ` · ${missingKeyframes}` : ""}
+            Shots{missingShotImages > 0 ? ` · ${missingShotImages}` : ""}
           </button>
           <button
-            onClick={onGoToProduction}
+            onClick={onRenderFinal}
             disabled={rendering}
             className="flex flex-[1.6] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
             title={
               missingClips > 0
-                ? `${missingClips} scene${missingClips === 1 ? "" : "s"} not yet rendered`
-                : "All scenes rendered"
+                ? `${missingClips} shot${missingClips === 1 ? "" : "s"} still need animating · music + voiceover will also be generated`
+                : "Re-render the final stitched MP4"
             }
           >
-            Go to production{missingClips > 0 ? ` · ${missingClips}` : ""}
+            Render final video
           </button>
         </div>
         {renderMsg && (
