@@ -297,6 +297,10 @@ function Studio() {
           meta={meta}
           duration={totalDuration}
           sceneCount={scenes.length}
+          isAgent={
+            ((projectQuery.data?.project.studioMode as StudioMode | undefined) ||
+              "agent") === "agent"
+          }
           panelOpen={panelOpen}
           canTogglePanel={hasPanelContent}
           onTogglePanel={() => setUserPanelPref(!panelOpen)}
