@@ -1022,7 +1022,7 @@ const ChatPanel = memo(function ChatPanel({
 
     </div>
   );
-}
+});
 
 // ---------- preview panel (storyboard grid) ----------
 
