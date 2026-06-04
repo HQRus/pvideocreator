@@ -1211,7 +1211,7 @@ function StatusDot({ status }: { status: Scene["status"] }) {
 
 // ---------- structure panel ----------
 
-function StructurePanel({
+const StructurePanel = memo(function StructurePanel({
   projectId,
   meta,
   scenes,
