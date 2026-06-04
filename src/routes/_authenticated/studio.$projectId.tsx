@@ -298,7 +298,7 @@ function Studio() {
           sceneCount={scenes.length}
           panelOpen={panelOpen}
           canTogglePanel={hasPanelContent}
-          onTogglePanel={() => setUserPanelPref(!panelOpen)}
+          onTogglePanel={onTogglePanel}
         />
         <div className="min-h-0 flex-1">
           <ChatPanel
@@ -306,9 +306,7 @@ function Studio() {
             initialMessages={initialMessages}
             onPatch={handlePatch}
             assets={assets}
-            registerSender={(fn) => {
-              chatSendRef.current = fn;
-            }}
+            registerSender={registerSender}
           />
         </div>
       </div>
@@ -344,7 +342,7 @@ function Studio() {
             activeSceneId={activeSceneId}
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
-            onChatCommand={(text) => chatSendRef.current?.(text)}
+            onChatCommand={onChatCommand}
           />
         </div>
       </aside>
