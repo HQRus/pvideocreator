@@ -316,6 +316,11 @@ function Studio() {
               (projectQuery.data?.project.studioMode as StudioMode | undefined) ||
               "agent"
             }
+            skill={
+              (projectQuery.data?.project.skill &&
+                SKILL_BY_ID[projectQuery.data.project.skill]) ||
+              null
+            }
             studioModel={studioModel}
             onToolbarChange={onToolbarChange}
             registerSender={(fn) => {
