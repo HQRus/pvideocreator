@@ -22,7 +22,7 @@ import {
 // "Shots" still routes through the chat AI (it asks the director to fill in
 // any missing shot images via the generate_image tool).
 // "Render final video" runs the deterministic fal.ai pipeline — no LLM.
-import { renderFinalVideo } from "@/lib/render.functions";
+import { renderFinalVideo, listProjectRenders } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
@@ -43,6 +43,7 @@ import {
   Maximize2,
   FolderOpen,
   Loader2,
+
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TimelinePanel } from "@/components/studio/timeline-panel";
