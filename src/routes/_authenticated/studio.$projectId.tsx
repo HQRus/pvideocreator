@@ -1286,7 +1286,7 @@ function StructurePanel({
   };
   return (
     <div className="relative flex h-full flex-col">
-      <Tabs defaultValue="storyboard" className="flex h-full flex-col">
+      <Tabs defaultValue="shots" className="flex h-full flex-col">
         <div className="px-8 pt-8">
           <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground">
             {meta.title}
@@ -1301,8 +1301,7 @@ function StructurePanel({
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
             {[
-              { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
-              { v: "scenes", icon: Film, label: "Scenes" },
+              { v: "shots", icon: Film, label: "Shots" },
               { v: "cast", icon: Users, label: "Cast" },
               { v: "music", icon: Music2, label: "Audio" },
               { v: "timeline", icon: ListVideo, label: "Timeline" },
@@ -1318,25 +1317,17 @@ function StructurePanel({
           </TabsList>
         </div>
 
-        <TabsContent value="storyboard" className="m-0 flex-1 overflow-hidden">
-          <PreviewPanel
-            scenes={scenes}
-            activeSceneId={activeSceneId}
-            onSelect={onSelect}
-            totalDuration={totalDuration}
-          />
-        </TabsContent>
-
-        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
+        <TabsContent value="shots" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
             {scenes.length === 0 && (
-              <EmptyHint icon={<Film className="h-8 w-8" />} text="Scenes will appear as you build out the storyboard." />
+              <EmptyHint icon={<Film className="h-8 w-8" />} text="Shots will appear as you build out your video with the director." />
             )}
             {scenes.map((s) => (
               <SceneRow
                 key={s.id}
                 scene={s}
                 active={s.id === activeSceneId}
+                aspectRatio={meta.aspectRatio}
                 onClick={() => onSelect(s.id)}
                 onChange={(next) =>
                   setScenes(scenes.map((x) => (x.id === next.id ? next : x)))
@@ -1344,7 +1335,7 @@ function StructurePanel({
               />
             ))}
             <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card/30 py-5 text-base font-semibold text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground">
-              <Plus className="h-5 w-5" /> Add scene
+              <Plus className="h-5 w-5" /> Add shot
             </button>
           </div>
         </TabsContent>
