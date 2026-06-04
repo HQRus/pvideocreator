@@ -344,6 +344,7 @@ function Studio() {
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
             onChatCommand={(text) => chatSendRef.current?.(text)}
+            studioMode={studioMode}
           />
         </div>
       </aside>
