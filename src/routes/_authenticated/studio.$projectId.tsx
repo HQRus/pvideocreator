@@ -1297,29 +1297,46 @@ function StructurePanel({
   };
   return (
     <div className="relative flex h-full flex-col">
-      <Tabs defaultValue="shots" className="flex h-full flex-col">
+      <Tabs
+        defaultValue={studioMode === "agent" ? "shots" : "gallery"}
+        className="flex h-full flex-col"
+      >
         <div className="px-8 pt-8">
           <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground">
             {meta.title}
           </h2>
-          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-            {meta.logline ||
-              "Your video's overview will appear here and evolve as you make decisions in the chat."}
-          </p>
-          <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
-          {assets.filter((a) => a.kind !== "keyframe").length > 0 && (
-            <AssetsStrip assets={assets.filter((a) => a.kind !== "keyframe")} />
+          {studioMode === "agent" ? (
+            <>
+              <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+                {meta.logline ||
+                  "Your video's overview will appear here and evolve as you make decisions in the chat."}
+              </p>
+              <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
+              {assets.filter((a) => a.kind !== "keyframe").length > 0 && (
+                <AssetsStrip assets={assets.filter((a) => a.kind !== "keyframe")} />
+              )}
+            </>
+          ) : (
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+              Every generation from this app collects here.
+            </p>
           )}
         </div>
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
-            {[
-              { v: "shots", icon: Film, label: "Shots" },
-              { v: "cast", icon: Users, label: "Cast" },
-              { v: "music", icon: Music2, label: "Audio" },
-              { v: "timeline", icon: ListVideo, label: "Timeline" },
-              { v: "renders", icon: History, label: "Renders" },
-            ].map(({ v, icon: Icon, label }) => (
+            {(studioMode === "agent"
+              ? [
+                  { v: "shots", icon: Film, label: "Shots" },
+                  { v: "cast", icon: Users, label: "Cast" },
+                  { v: "music", icon: Music2, label: "Audio" },
+                  { v: "timeline", icon: ListVideo, label: "Timeline" },
+                  { v: "renders", icon: History, label: "Renders" },
+                ]
+              : [
+                  { v: "gallery", icon: LayoutGrid, label: "Gallery" },
+                  { v: "renders", icon: History, label: "Renders" },
+                ]
+            ).map(({ v, icon: Icon, label }) => (
               <TabsTrigger
                 key={v}
                 value={v}
@@ -1330,6 +1347,12 @@ function StructurePanel({
             ))}
           </TabsList>
         </div>
+
+        {studioMode !== "agent" && (
+          <TabsContent value="gallery" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
+            <GalleryGrid assets={assets} />
+          </TabsContent>
+        )}
 
         <TabsContent value="shots" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
