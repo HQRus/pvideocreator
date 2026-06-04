@@ -923,7 +923,7 @@ function ChatPanel({
               />
             </div>
           )}
-          {!busy && !activeCard && history.length === 0 && (
+          {!busy && !activeCard && history.length === 0 && studioMode === "agent" && (
             <div className="mb-4 flex flex-wrap gap-2">
               {STARTERS.map((s) => (
                 <button
@@ -934,6 +934,11 @@ function ChatPanel({
                   {s}
                 </button>
               ))}
+            </div>
+          )}
+          {!busy && studioMode !== "agent" && history.length > 0 && (
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Create another
             </div>
           )}
           <PromptInput
