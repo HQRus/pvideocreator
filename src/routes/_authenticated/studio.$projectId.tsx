@@ -911,10 +911,19 @@ function ChatPanel({
               autoFocus
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type freely…"
+              placeholder={
+                studioMode === "agent"
+                  ? "Type freely…"
+                  : `Describe the ${studioMode} you want…`
+              }
               className="text-lg"
             />
-            <PromptInputFooter className="justify-end">
+            <PromptInputFooter className="justify-between gap-2">
+              <StudioToolbar
+                mode={studioMode}
+                model={studioModel}
+                onChange={onToolbarChange}
+              />
               <PromptInputSubmit status={status} disabled={busy && !input} />
             </PromptInputFooter>
           </PromptInput>
