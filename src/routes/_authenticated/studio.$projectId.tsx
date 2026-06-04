@@ -504,7 +504,7 @@ const FloatingGallery = memo(function FloatingGallery({
       </div>
     </aside>
   );
-}
+});
 
 function ProjectAvatar({
   title,
