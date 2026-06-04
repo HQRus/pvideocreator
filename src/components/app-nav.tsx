@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { BrandMark } from "@/components/reelable-mark";
+import { BrandMark } from "@/components/pika-mark";
 
 const NAV_ITEMS = [
   { to: "/projects", label: "Projects" },
@@ -14,7 +14,7 @@ export function AppNav() {
         <Link to="/projects" className="flex items-center gap-2.5">
           <BrandMark className="h-7 w-7" />
           <span className="font-display text-lg font-semibold tracking-tight">
-            Reelable
+            Pika X
           </span>
         </Link>
         <nav className="flex items-center gap-1">

@@ -58,7 +58,7 @@ import {
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
-import { BrandMark } from "@/components/reelable-mark";
+import { BrandMark } from "@/components/pika-mark";
 import { Button } from "@/components/ui/button";
 import {
   GenerativeCard,
