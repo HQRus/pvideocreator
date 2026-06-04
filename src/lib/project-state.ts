@@ -37,6 +37,7 @@ export type AssetKind =
   | "likeness"
   | "logo"
   | "reference"
+  | "keyframe"
   | "voice"
   | "audio"
   | "video"
