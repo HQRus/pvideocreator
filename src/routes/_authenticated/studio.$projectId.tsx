@@ -303,6 +303,10 @@ function Studio() {
             onPatch={handlePatch}
             assets={assets}
             studioMode={studioMode}
+            projectMode={
+              (projectQuery.data?.project.studioMode as StudioMode | undefined) ||
+              "agent"
+            }
             studioModel={studioModel}
             onToolbarChange={onToolbarChange}
             registerSender={(fn) => {
