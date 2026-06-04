@@ -1554,6 +1554,61 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
+// ---------- gallery (app-mode: all generations) ----------
+
+const GENERATION_KINDS = new Set([
+  "image",
+  "video",
+  "audio",
+  "music",
+  "voiceover",
+  "keyframe",
+  "final",
+]);
+
+function GalleryGrid({ assets }: { assets: ProjectAsset[] }) {
+  const items = assets.filter((a) => GENERATION_KINDS.has(a.kind));
+  if (items.length === 0) {
+    return (
+      <EmptyHint
+        icon={<LayoutGrid className="h-8 w-8" />}
+        text="No generations yet — describe what you want in the chat to create your first one."
+      />
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {items
+        .slice()
+        .reverse()
+        .map((a) => (
+          <a
+            key={a.id}
+            href={a.url}
+            target="_blank"
+            rel="noreferrer"
+            className="group relative block overflow-hidden rounded-2xl border border-border/60 bg-muted/40"
+          >
+            {a.mime.startsWith("image/") && (
+              <img src={a.url} alt={a.label || a.name} className="aspect-square w-full object-cover" />
+            )}
+            {a.mime.startsWith("video/") && (
+              <video src={a.url} className="aspect-square w-full object-cover" muted playsInline />
+            )}
+            {a.mime.startsWith("audio/") && (
+              <div className="flex aspect-square w-full items-center justify-center bg-muted/60 p-3">
+                <audio src={a.url} controls className="w-full" />
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-background/90 to-transparent px-3 py-2 text-xs font-medium text-foreground opacity-0 transition group-hover:opacity-100">
+              {a.label || a.name}
+            </div>
+          </a>
+        ))}
+    </div>
+  );
+}
+
 // ---------- renders panel ----------
 
 function RendersPanel({
