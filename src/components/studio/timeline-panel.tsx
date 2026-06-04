@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Play, Pause, Copy, Trash2, Music2, Mic, Volume2, Film } from "lucide-react";
 import type { Scene, Music, ProjectAsset } from "@/lib/project-state";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,7 @@ const BASE_PPS = 60;
 const MIN_DUR = 0.5;
 const MAX_DUR = 60;
 
-export function TimelinePanel({
+function TimelinePanelImpl({
   scenes,
   setScenes,
   activeSceneId,
