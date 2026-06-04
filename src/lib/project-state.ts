@@ -9,6 +9,8 @@ export type Scene = {
   // Motion / camera direction used when generating the video clip from
   // the keyframe (e.g. "slow push-in, handheld, board flicks up at 0:02").
   motionPrompt?: string;
+  // Optional voiceover line read during this shot.
+  voPrompt?: string;
   // URL of the rendered video clip for this scene, once production finishes.
   clipUrl?: string;
 };
@@ -38,6 +40,9 @@ export type AssetKind =
   | "logo"
   | "reference"
   | "keyframe"
+  | "music"
+  | "voiceover"
+  | "final"
   | "voice"
   | "audio"
   | "video"
@@ -117,6 +122,7 @@ function normalizeScene(s: Partial<Scene>, fallbackN: number): Scene {
     thumb: s.thumb ?? "",
     status: s.status ?? "drafting",
     motionPrompt: s.motionPrompt,
+    voPrompt: s.voPrompt,
     clipUrl: s.clipUrl,
   };
 }

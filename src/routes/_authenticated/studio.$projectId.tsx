@@ -5,16 +5,17 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import symbolLogo from "@/assets/symbol.svg";
-import { fetchWithAuth, buildAuthHeaders } from "@/lib/fetch-with-auth";
+import { buildAuthHeaders } from "@/lib/fetch-with-auth";
 import {
   getProject,
   updateProjectState,
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
-// "Generate keyframes" still routes through the chat AI (image gen tools).
-// "Go to production" runs the deterministic server pipeline below — no LLM.
-import { startProduction } from "@/lib/render.functions";
+// "Shots" still routes through the chat AI (it asks the director to fill in
+// any missing shot images via the generate_image tool).
+// "Render final video" runs the deterministic fal.ai pipeline — no LLM.
+import { renderFinalVideo } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
@@ -27,7 +28,6 @@ import {
   Users,
   Music2,
   Clock,
-  GripVertical,
   Plus,
   ImagePlus,
   Wand2,
@@ -82,32 +82,12 @@ export const Route = createFileRoute("/_authenticated/studio/$projectId")({
 function Studio() {
   const navigate = useNavigate();
   const { projectId } = Route.useParams();
-  const [gate, setGate] = useState<"checking" | "ready">("checking");
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetchWithAuth("/api/pika/status");
-        const j = (await r.json()) as { state?: string };
-        if (cancelled) return;
-        if (j.state === "ready") setGate("ready");
-        else void navigate({ to: "/" });
-      } catch {
-        if (!cancelled) void navigate({ to: "/" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [navigate]);
-
   const fetchProject = useServerFn(getProject);
   const updateState = useServerFn(updateProjectState);
   const queryClient = useQueryClient();
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => fetchProject({ data: { id: projectId } }),
-    enabled: gate === "ready",
     staleTime: Infinity,
   });
 
@@ -192,9 +172,9 @@ function Studio() {
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
   // Subscribe to live project_state updates pushed by the render pipeline,
-  // so scene thumbnails appear as keyframes finish.
+  // so shot thumbnails appear as images finish.
   useEffect(() => {
-    if (gate !== "ready" || !projectId) return;
+    if (!projectId) return;
     const channel = supabase
       .channel(`project-${projectId}`)
       .on(
@@ -215,7 +195,7 @@ function Studio() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [projectId, gate]);
+  }, [projectId]);
 
   const handlePatch = (patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
@@ -246,10 +226,10 @@ function Studio() {
   const setScenes = (next: Scene[]) =>
     setProject((prev) => ({ ...prev, scenes: next }));
 
-  if (gate !== "ready" || projectQuery.isLoading) {
+  if (projectQuery.isLoading) {
     return (
       <div className="grid h-screen w-full place-items-center bg-background text-sm text-muted-foreground">
-        {gate !== "ready" ? "Checking Pika connection…" : "Loading project…"}
+        Loading project…
       </div>
     );
   }
@@ -577,103 +557,7 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// Deep-walk a Pika MCP tool result looking for video URLs. MCP responses
-// usually arrive as { content: [{ type: "text", text: "..." }, ...] } and
-// may also include structuredContent. We accept any http(s) URL with a
-// video-ish extension or path hint.
-function extractVideoAssets(out: unknown): ProjectAsset[] {
-  const urls = new Set<string>();
-  const visit = (v: unknown) => {
-    if (!v) return;
-    if (typeof v === "string") {
-      const re = /https?:\/\/[^\s"'<>)]+/g;
-      const matches = v.match(re);
-      if (matches) {
-        for (const u of matches) {
-          if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u) || /pika|video|cdn/i.test(u)) {
-            if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) urls.add(u);
-          }
-        }
-      }
-      return;
-    }
-    if (Array.isArray(v)) { v.forEach(visit); return; }
-    if (typeof v === "object") {
-      for (const val of Object.values(v as Record<string, unknown>)) visit(val);
-    }
-  };
-  visit(out);
-  let i = 0;
-  return Array.from(urls).map((url) => ({
-    id: `ast_pika_${Date.now().toString(36)}_${i++}`,
-    kind: "video" as const,
-    mime: /\.webm/i.test(url) ? "video/webm" : "video/mp4",
-    name: url.split("/").pop()?.split("?")[0] || "pika-clip.mp4",
-    url,
-    label: "Pika clip",
-  }));
-}
-
 // ---------- chat panel ----------
-
-function PikaCallChip({
-  call,
-}: {
-  call: {
-    name: string;
-    state: string;
-    input: unknown;
-    output: unknown;
-    videoCount: number;
-    errorText: string | null;
-  };
-}) {
-  const [open, setOpen] = useState(false);
-  const pending = call.state !== "output-available" && call.state !== "output-error";
-  const status = pending
-    ? "rendering…"
-    : call.errorText
-      ? "error"
-      : `${call.videoCount} video${call.videoCount === 1 ? "" : "s"}`;
-  const dot = pending
-    ? "bg-amber-400 animate-pulse"
-    : call.errorText
-      ? "bg-destructive"
-      : "bg-emerald-500";
-  return (
-    <div className="rounded-xl border border-border bg-background/40">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm"
-      >
-        <span className={`h-2 w-2 rounded-full ${dot}`} />
-        <span className="font-mono text-xs text-foreground">{call.name}</span>
-        <span className="text-xs text-muted-foreground">· {status}</span>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {open ? "hide" : "details"}
-        </span>
-      </button>
-      {open && (
-        <div className="border-t border-border px-3 py-2 text-xs">
-          {call.errorText && (
-            <div className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-destructive">
-              {call.errorText}
-            </div>
-          )}
-          <div className="mb-1 font-medium text-muted-foreground">Input</div>
-          <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px]">
-            {JSON.stringify(call.input, null, 2)}
-          </pre>
-          <div className="mb-1 font-medium text-muted-foreground">Output</div>
-          <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px]">
-            {JSON.stringify(call.output, null, 2)}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
-}
 
 const STARTERS = [
   "Music video",
@@ -801,10 +685,6 @@ function ChatPanel({
           onPatch({ assetsAppend: out.assets });
         } else if (p.type === "tool-commit_project_patch" && out.patch) {
           onPatch(out.patch as ProjectPatch);
-        } else if (p.type.startsWith("tool-pika_")) {
-          // Sweep Pika MCP tool outputs for video URLs and attach them.
-          const videos = extractVideoAssets(out);
-          if (videos.length) onPatch({ assetsAppend: videos });
         }
       }
     }
@@ -854,42 +734,6 @@ function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, activeCard?.key, busy]);
 
-  // Collect every Pika MCP tool call across the whole conversation so the
-  // user can verify what actually ran (vs. the model just narrating).
-  const pikaCalls: Array<{
-    key: string;
-    name: string;
-    state: string;
-    input: unknown;
-    output: unknown;
-    videoCount: number;
-    errorText: string | null;
-  }> = [];
-  for (const m of messages) {
-    if (m.role !== "assistant") continue;
-    for (const p of toolPartsOf(m)) {
-      if (!p.type.startsWith("tool-pika_")) continue;
-      const out = p.output as { error?: unknown } | undefined;
-      const videos = p.state === "output-available" ? extractVideoAssets(out) : [];
-      let errorText: string | null = null;
-      if (p.state === "output-error") errorText = "Tool errored.";
-      else if (out && typeof out === "object" && "error" in out && out.error) {
-        errorText = typeof out.error === "string" ? out.error : JSON.stringify(out.error);
-      } else if (p.state === "output-available" && videos.length === 0) {
-        errorText = "Returned no video URL.";
-      }
-      pikaCalls.push({
-        key: `${m.id}-${p.toolCallId ?? p.type}`,
-        name: p.type.replace(/^tool-/, ""),
-        state: p.state ?? "unknown",
-        input: p.input,
-        output: p.output,
-        videoCount: videos.length,
-        errorText,
-      });
-    }
-  }
-
   return (
     <div className="relative flex h-full flex-col">
       <Conversation className="flex-1">
@@ -898,18 +742,6 @@ function ChatPanel({
             <BrandMark className="h-12 w-12" />
             <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
           </div>
-          {pikaCalls.length > 0 &&
-            typeof window !== "undefined" &&
-            window.localStorage?.getItem("avd:dev") === "1" && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card/50 p-3">
-              <div className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Pika render activity
-              </div>
-              {pikaCalls.map((c) => (
-                <PikaCallChip key={c.key} call={c} />
-              ))}
-            </div>
-          )}
           {history.map((it) =>
             it.kind === "user" ? (
               <UserBubble key={it.key} text={it.text} assets={assets} />
@@ -942,9 +774,7 @@ function ChatPanel({
                   ? "Generating an image…"
                   : pendingTools[0] === "search_stock_media"
                     ? "Searching references…"
-                    : pendingTools[0].startsWith("pika_")
-                      ? `Rendering with Pika (${pendingTools[0]}) — usually 30–90s…`
-                      : `Running ${pendingTools[0]}…`
+                    : `Running ${pendingTools[0]}…`
                 : "Thinking…"}
             </Shimmer>
           )}
@@ -1230,12 +1060,12 @@ function StructurePanel({
 }) {
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
-  const runProduction = useServerFn(startProduction);
-  const missingKeyframes = scenes.filter((s) => !s.thumb).length;
+  const runFinal = useServerFn(renderFinalVideo);
+  const missingShotImages = scenes.filter((s) => !s.thumb).length;
   const missingClips = scenes.filter((s) => !s.clipUrl).length;
-  const onGenerateKeyframes = () => {
+  const onGenerateShotImages = () => {
     if (scenes.length === 0) {
-      setRenderMsg("Draft at least one scene first — describe the concept in chat.");
+      setRenderMsg("Draft at least one shot first — describe the concept in chat.");
       return;
     }
     const likenessAssetIds = Array.from(
@@ -1244,38 +1074,37 @@ function StructurePanel({
         ...assets.filter((a) => a.kind === "likeness").map((a) => a.id),
       ]),
     );
-    setRenderMsg("Asked the director to generate keyframes.");
+    setRenderMsg("Asked the director to generate shot images.");
     onChatCommand?.(
-      `GENERATE KEYFRAMES NOW for every scene that doesn't already have one. ` +
-      `For each such scene, call the generate_image tool with a vivid, cinematic prompt that bakes in: ` +
-      `(1) the project logline, (2) the scene title + scene prompt, (3) the cast notes & any uploaded ` +
-      `likeness/reference assets, and (4) a consistent visual style across all keyframes. ` +
+      `GENERATE SHOT IMAGES NOW for every shot that doesn't already have one. ` +
+      `For each such shot, call the generate_image tool with a vivid, cinematic prompt that bakes in: ` +
+      `(1) the project logline, (2) the shot title + shot prompt, (3) the cast notes & any uploaded ` +
+      `likeness/reference assets, and (4) a consistent visual style across all shots. ` +
       `${likenessAssetIds.length ? `Use referenceAssetIds=${JSON.stringify(likenessAssetIds)} anywhere the user or cast should appear so their face is actually used in generation. ` : ""}` +
       `After each image returns, emit a commit_project_patch that updates scenes[i].thumb to the new ` +
-      `asset URL (and sets status to "ready"). Do all scenes in this turn. Final card: a short handoff ` +
-      `confirming how many keyframes were generated.`,
+      `asset URL (and sets status to "ready"). Do all shots in this turn. Final card: a short handoff ` +
+      `confirming how many shot images were generated.`,
     );
   };
-  const onGoToProduction = async () => {
+  const onRenderFinal = async () => {
     if (scenes.length === 0) {
-      setRenderMsg("Draft at least one scene first.");
-      return;
-    }
-    if (missingClips === 0) {
-      setRenderMsg("Every scene already has a clip. Nothing to render.");
+      setRenderMsg("Draft at least one shot first.");
       return;
     }
     setRendering(true);
-    setRenderMsg(`Rendering ${missingClips} scene${missingClips === 1 ? "" : "s"} via Pika…`);
+    setRenderMsg(
+      `Rendering final video — generating any missing shot images, animating shots, scoring music, recording voiceover, then stitching. This can take several minutes.`,
+    );
     try {
-      const res = await runProduction({ data: { projectId } });
-      if ("error" in res && res.error === "pika_not_connected") {
-        setRenderMsg("Pika isn't connected. Connect Pika from the header to render clips.");
-      } else if ("okCount" in res) {
-        const parts: string[] = [];
-        if (res.okCount) parts.push(`${res.okCount} rendered`);
-        if (res.failCount) parts.push(`${res.failCount} failed`);
-        setRenderMsg(parts.join(" · ") || "Nothing to render.");
+      const res = await runFinal({ data: { projectId } });
+      if (res.status === "done") {
+        setRenderMsg(
+          `Final video ready${res.failed ? ` — ${res.failed} step(s) failed but film is complete.` : "."}`,
+        );
+      } else {
+        setRenderMsg(
+          `Final stitch skipped — ${res.failed} step(s) failed. Retry from the affected shot(s).`,
+        );
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1463,28 +1292,28 @@ function StructurePanel({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
           <button
-            onClick={onGenerateKeyframes}
+            onClick={onGenerateShotImages}
             disabled={rendering}
             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-muted/60 py-4 text-sm font-bold tracking-tight text-foreground transition hover:bg-muted disabled:opacity-60"
             title={
-              missingKeyframes > 0
-                ? `${missingKeyframes} scene${missingKeyframes === 1 ? "" : "s"} missing a keyframe`
-                : "All scenes have keyframes"
+              missingShotImages > 0
+                ? `${missingShotImages} shot${missingShotImages === 1 ? "" : "s"} missing an image`
+                : "All shots have images"
             }
           >
-            Keyframes{missingKeyframes > 0 ? ` · ${missingKeyframes}` : ""}
+            Shots{missingShotImages > 0 ? ` · ${missingShotImages}` : ""}
           </button>
           <button
-            onClick={onGoToProduction}
+            onClick={onRenderFinal}
             disabled={rendering}
             className="flex flex-[1.6] items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-4 text-base font-bold tracking-tight text-primary-foreground shadow-glow transition hover:opacity-95 disabled:opacity-60"
             title={
               missingClips > 0
-                ? `${missingClips} scene${missingClips === 1 ? "" : "s"} not yet rendered`
-                : "All scenes rendered"
+                ? `${missingClips} shot${missingClips === 1 ? "" : "s"} still need animating · music + voiceover will also be generated`
+                : "Re-render the final stitched MP4"
             }
           >
-            Go to production{missingClips > 0 ? ` · ${missingClips}` : ""}
+            Render final video
           </button>
         </div>
         {renderMsg && (
@@ -1642,6 +1471,26 @@ function SceneRow({
     </p>
   );
 
+  const voiceover = (
+    <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+        Voiceover (optional)
+      </div>
+      <textarea
+        defaultValue={scene.voPrompt ?? ""}
+        placeholder="What the narrator says during this shot…"
+        onBlur={(e) => {
+          const next = e.target.value;
+          if (next !== (scene.voPrompt ?? "")) {
+            onChange({ ...scene, voPrompt: next });
+          }
+        }}
+        rows={2}
+        className="w-full resize-none rounded-xl border border-border bg-background/60 p-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+      />
+    </div>
+  );
+
   const thumb = (
     <div
       className={`overflow-hidden rounded-xl bg-muted ${isHorizontal ? "w-full" : "w-72 shrink-0"}`}
@@ -1670,6 +1519,7 @@ function SceneRow({
           <div className="min-w-0">
             {header}
             {description}
+            {voiceover}
           </div>
         </div>
       ) : (
@@ -1678,6 +1528,7 @@ function SceneRow({
           <div className="min-w-0 flex-1">
             {header}
             {description}
+            {voiceover}
           </div>
         </div>
       )}

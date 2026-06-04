@@ -8,17 +8,10 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
-import { putAsset, base64ToBytes } from "@/lib/asset-cache.server";
 import {
-  storeAsset,
   downloadAndStoreUrl,
-  sweepCandidateVideoUrls,
 } from "@/lib/project-assets.server";
-import {
-  callbackUrlFromRequest,
-  getStatus,
-  openPikaMCPClient,
-} from "@/lib/pika-mcp.server";
+import { falGenerateImage } from "@/lib/fal.server";
 import { requireUser, unauthorizedResponse } from "@/lib/auth-route.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { applyPatch, INITIAL_PROJECT, type ProjectState } from "@/lib/project-state";
@@ -29,10 +22,7 @@ let _toolAssetCounter = 0;
 const nextToolAssetId = () =>
   `ast_t${Date.now().toString(36)}${(++_toolAssetCounter).toString(36)}`;
 
-// Walk an arbitrary value for video-ish URLs (used to summarize Pika output in logs).
-const sweepVideoUrls = sweepCandidateVideoUrls;
-
-const CHAT_IMAGE_MODEL = "google/gemini-2.5-flash-image";
+const CHAT_IMAGE_MODEL = "fal/nano-banana";
 
 function truncateLine(value: string, max = 220): string {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
@@ -87,81 +77,7 @@ function buildProjectStateContext(state: ProjectState | null | undefined): strin
   ].join("\n");
 }
 
-async function gatewayGenerateImage(
-  prompt: string,
-  apiKey: string,
-  referenceImageUrls: string[] = [],
-): Promise<{ b64: string; mime: string }> {
-  if (referenceImageUrls.length > 0) {
-    const res = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: CHAT_IMAGE_MODEL,
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: prompt },
-                ...referenceImageUrls.map((url) => ({
-                  type: "image_url",
-                  image_url: { url },
-                })),
-              ],
-            },
-          ],
-          modalities: ["image", "text"],
-        }),
-      },
-    );
-    if (!res.ok) {
-      throw new Error(`Image gateway error ${res.status}: ${await res.text()}`);
-    }
-    const data = (await res.json()) as {
-      choices?: Array<{
-        message?: { images?: Array<{ image_url?: { url?: string } }> };
-      }>;
-    };
-    const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!url) throw new Error("Image gateway returned no image");
-    const match = url.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) throw new Error("unexpected image_url format");
-    return { mime: match[1], b64: match[2] };
-  }
-  const res = await fetch(
-    "https://ai.gateway.lovable.dev/v1/images/generations",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-image-2",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "low",
-      }),
-    },
-  );
-  if (!res.ok) {
-    throw new Error(`Image gateway error ${res.status}: ${await res.text()}`);
-  }
-  const data = (await res.json()) as {
-    data?: Array<{ b64_json?: string; url?: string }>;
-  };
-  const first = data.data?.[0];
-  if (first?.b64_json) {
-    return { b64: first.b64_json, mime: "image/png" };
-  }
-  throw new Error("Image gateway returned no image");
-}
+// Image generation flows through fal nano-banana via `falGenerateImage`.
 
 const STOCK_LIBRARY: Array<{ tags: string[]; url: string; label: string }> = [
   {
@@ -486,21 +402,21 @@ The Project panel must never sit empty after the user has given a concept.
   later keyframe generation can stay visually consistent.
 - Uploaded assets in user messages also include a "url=https://..." which
   is the durable signed URL for that file. When you call generate_image,
-  pika_*, or any external tool that needs the actual image (e.g. for a
-  character likeness reference), pass that EXACT url through — do NOT
+  or any external tool that needs the actual image (e.g. for a character
+  likeness reference), pass that EXACT url through — do NOT
   invent a URL from the asset id, do NOT use the bare [ast_xxx] token, and
   do NOT skip the reference just because direct fetches failed once. If a
   tool says it can't reach the link, retry with the same url before
   falling back to a text-only description.
-- When the user approves the storyboard (or asks for keyframes), call
+- When the user approves the storyboard (or asks for shot images), call
   generate_image once per scene with a vivid prompt that bakes in the
   logline + scene.prompt + character description + a consistent style note.
   Then commit_project_patch to set each scene.thumb to the returned asset
   URL and scene.status = "ready".
-- Video clip rendering is handled by the "Go to production" button in the
-  Project panel — that runs a deterministic server pipeline, not chat.
-  You may still call pika_* tools when the user asks in conversation for
-  a one-off scene render or revision.
+- Animating shots, generating music, generating voiceover, and stitching the
+  final MP4 are handled by the "Render final video" button in the Project
+  panel — it runs a deterministic fal.ai pipeline, not chat. You do not need
+  to (and cannot) call video, music, or stitch tools from chat.
 
 Rules for patches:
 - Use "scenes" / "cast" to REPLACE the full list. Use "scenesAppend" / "castAppend" to add to it.
@@ -560,31 +476,12 @@ message. The card is the user-facing response; tool results alone are not.
   <script data-project-patch> block). Prefer this when you are also calling
   another tool in the same turn — keeps state updates atomic.
 
-- pika_* tools (only present when the workspace has connected Pika)
-  Use these to GENERATE ACTUAL VIDEO CLIPS via Pika. Call them when the
-  user has approved a scene/prompt and you're ready to produce moving
-  footage. The returned video URL is auto-attached to project state — do
-  NOT also list it in assetsAppend, just reference its asset id. If no
-  pika_* tool is available, you cannot render video yet — tell the user
-  to connect Pika via the "Connect Pika" pill in the header.
-
 Etiquette: at most 3 tool calls per turn. Tool-generated assets are already
 in project state — do NOT also list them in assetsAppend, just reference
 them by id.
 `;
 
 type ChatRequestBody = { messages?: unknown; projectId?: unknown };
-
-const SAFE_PIKA_TOOL_NAMES = new Set([
-  "upload_asset",
-  "generate_image",
-  "generate_video",
-  "generate_reference_video",
-  "generate_keyframes_video",
-  "task_status",
-  "task_cancel",
-  "analyze_media",
-]);
 
 function extractPatchFromText(text: string): unknown | null {
   const m = text.match(
@@ -694,44 +591,34 @@ export const Route = createFileRoute("/api/chat")({
                 const promptWithRefs = resolvedReferenceUrls.length
                   ? `${prompt}\n\nIMPORTANT: Match the exact likeness, face, hair, skin tone, and identifying features from the provided reference image(s). Keep this person clearly recognizable.`
                   : prompt;
-                const { b64, mime } = await gatewayGenerateImage(
-                  promptWithRefs,
-                  key,
-                  resolvedReferenceUrls,
-                );
-                const bytes = base64ToBytes(b64);
-                // Persist durably so the asset survives page reload.
+                const sourceUrl = await falGenerateImage({
+                  prompt: promptWithRefs,
+                  aspect: projectState.meta.aspectRatio || "16:9",
+                  referenceImageUrls: resolvedReferenceUrls.filter((u) =>
+                    /^https?:/.test(u),
+                  ),
+                });
                 try {
-                  const stored = await storeAsset({
+                  const stored = await downloadAndStoreUrl({
                     projectId,
                     userId,
+                    sourceUrl,
                     kind: kind ?? "reference",
-                    mime,
-                    bytes,
                     label,
-                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                    fallbackMime: "image/png",
                   });
                   return {
                     id: stored.id,
                     kind: kind ?? "reference",
-                    mime,
+                    mime: stored.mime,
                     name: (label ?? prompt.slice(0, 40)) + ".png",
                     url: stored.url,
                     label,
                   };
                 } catch (e) {
-                  // Fall back to in-memory cache so the current turn still
-                  // works even if storage upload fails.
-                  console.error("[chat] storeAsset failed, falling back:", e);
-                  const id = nextToolAssetId();
-                  putAsset(id, mime, bytes);
+                  console.error("[chat] downloadAndStoreUrl failed:", e);
                   return {
-                    id,
-                    kind: kind ?? "reference",
-                    mime,
-                    name: (label ?? prompt.slice(0, 40)) + ".png",
-                    url: `/api/asset/${id}`,
-                    label,
+                    error: e instanceof Error ? e.message : String(e),
                   };
                 }
               } catch (err) {
@@ -777,74 +664,14 @@ export const Route = createFileRoute("/api/chat")({
           }),
         };
 
-        // Merge in Pika MCP tools if the workspace has an active connection.
-        let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
-        try {
-          if ((await getStatus(userId)) === "ready") {
-            const redirectUri = callbackUrlFromRequest(request);
-            pikaClient = await openPikaMCPClient(userId, redirectUri);
-            const pikaTools = await pikaClient.tools();
-            for (const [name, t] of Object.entries(pikaTools)) {
-              if (!SAFE_PIKA_TOOL_NAMES.has(name)) {
-                continue;
-              }
-              const key = `pika_${name}`;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const original = t as any;
-              const origExec: ((args: unknown, ctx: unknown) => unknown) | undefined =
-                typeof original.execute === "function"
-                  ? original.execute.bind(original)
-                  : undefined;
-              tools[key] = origExec
-                ? {
-                    ...original,
-                    execute: async (args: unknown, ctx: unknown) => {
-                      const start = Date.now();
-                      const argSummary = JSON.stringify(args).slice(0, 400);
-                      console.log(`[pika] -> ${key} args=${argSummary}`);
-                      try {
-                        const out = await origExec(args, ctx);
-                        const urls = sweepVideoUrls(out);
-                        const ms = Date.now() - start;
-                        const outSummary = JSON.stringify(out).slice(0, 500);
-                        console.log(
-                          `[pika] <- ${key} ${ms}ms videos=${urls.length}${urls.length ? " " + urls.join(",") : ""} out=${outSummary}`,
-                        );
-                        return out;
-                      } catch (err) {
-                        const ms = Date.now() - start;
-                        console.error(`[pika] !! ${key} ${ms}ms threw`, err);
-                        throw err;
-                      }
-                    },
-                  }
-                : t;
-            }
-          }
-        } catch (err) {
-          console.error("[pika] failed to load MCP tools:", err);
-          if (pikaClient) {
-            try { await pikaClient.close(); } catch {}
-            pikaClient = null;
-          }
-        }
-
         const result = streamText({
           model,
           system: `${SYSTEM_PROMPT}\n\n${buildProjectStateContext(projectState)}`,
           tools: tools as never,
           stopWhen: stepCountIs(50) as never,
           messages: await convertToModelMessages(messages as UIMessage[]),
-          onFinish: async () => {
-            if (pikaClient) {
-              try { await pikaClient.close(); } catch {}
-            }
-          },
           onError: async ({ error }) => {
             console.error("[chat] streamText error:", error);
-            if (pikaClient) {
-              try { await pikaClient.close(); } catch {}
-            }
           },
         });
 
@@ -876,110 +703,23 @@ export const Route = createFileRoute("/api/chat")({
                     },
                     { onConflict: "id" },
                   );
-                // Persist pika clip URLs durably AND assign each to a scene.
-                const sceneAssignments: Array<{
-                  durableUrl: string;
-                  inputStr: string;
-                }> = [];
-                try {
-                  const toolParts = (lastAssistant.parts as Array<{
-                    type: string;
-                    state?: string;
-                    input?: unknown;
-                    output?: unknown;
-                  }>).filter(
-                    (p) =>
-                      typeof p.type === "string" &&
-                      p.type.startsWith("tool-pika_") &&
-                      p.state === "output-available",
-                  );
-                  for (const p of toolParts) {
-                    const urls = sweepVideoUrls(p.output);
-                    let inputStr = "";
-                    try {
-                      inputStr = JSON.stringify(p.input ?? {});
-                    } catch {}
-                    for (const u of urls) {
-                      try {
-                        const stored = await downloadAndStoreUrl({
-                          projectId,
-                          userId,
-                          sourceUrl: u,
-                          kind: "video",
-                          label: "Pika clip",
-                          fallbackMime: "video/mp4",
-                        });
-                        sceneAssignments.push({
-                          durableUrl: stored.url,
-                          inputStr,
-                        });
-                      } catch (e) {
-                        console.error("[chat] pika clip persist failed:", e);
-                        // Fall back to source URL so the user still sees something.
-                        sceneAssignments.push({
-                          durableUrl: u,
-                          inputStr,
-                        });
-                      }
-                    }
-                  }
-                } catch (e) {
-                  console.error("[chat] pika clip scan failed:", e);
-                }
                 // Apply embedded project patch (if any) to project_state.
                 const text = (lastAssistant.parts as Array<{ type: string; text?: string }>)
                   .filter((p) => p.type === "text")
                   .map((p) => p.text ?? "")
                   .join("");
                 const patch = extractPatchFromText(text);
-                if (patch || sceneAssignments.length) {
+                if (patch) {
                   const { data: cur } = await supabaseAdmin
                     .from("projects")
                     .select("project_state, title")
                     .eq("id", projectId)
                     .maybeSingle();
                   if (cur) {
-                    let next = applyPatch(
+                    const next = applyPatch(
                       (cur.project_state as ProjectState) ?? INITIAL_PROJECT,
                       (patch as never) ?? null,
                     );
-                    // Map pika clips onto scenes. Prefer thumb-URL match in
-                    // the tool's input args; fall back to next scene without
-                    // a clipUrl.
-                    if (sceneAssignments.length) {
-                      const scenes = next.scenes.map((s) => ({ ...s }));
-                      let cursor = 0;
-                      for (const a of sceneAssignments) {
-                        let idx = -1;
-                        if (a.inputStr) {
-                          idx = scenes.findIndex(
-                            (s) =>
-                              !s.clipUrl &&
-                              s.thumb &&
-                              a.inputStr.includes(s.thumb),
-                          );
-                        }
-                        if (idx < 0) {
-                          while (
-                            cursor < scenes.length &&
-                            scenes[cursor].clipUrl
-                          )
-                            cursor++;
-                          if (cursor < scenes.length) {
-                            idx = cursor;
-                            cursor++;
-                          }
-                        }
-                        if (idx >= 0) {
-                          scenes[idx] = {
-                            ...scenes[idx],
-                            clipUrl: a.durableUrl,
-                            status: "ready",
-                          };
-                        }
-                      }
-                      next = { ...next, scenes };
-                    }
                     const patchTitle = (patch as { meta?: { title?: string } })
                       ?.meta?.title;
                     const newTitle =
@@ -1004,9 +744,9 @@ export const Route = createFileRoute("/api/chat")({
         });
 
         // Keep the stream running server-side even if the client disconnects
-        // mid-flight (long Pika tool calls). Without this, onFinish never
-        // runs when the user navigates away or the network blips, and the
-        // assistant message + clip URLs are lost.
+        // mid-flight. Without this, onFinish never runs when the user
+        // navigates away or the network blips, and the assistant message is
+        // lost.
         void result.consumeStream();
 
         return response;
