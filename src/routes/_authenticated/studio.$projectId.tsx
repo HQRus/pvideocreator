@@ -105,6 +105,30 @@ function Studio() {
     }
   }, [projectQuery.data?.project.id]);
 
+  // Studio toolbar state: agent | image | video | audio | speech + selected
+  // Fal model. Seeded from project columns; persisted server-side on change.
+  const [studioMode, setStudioMode] = useState<StudioMode>("agent");
+  const [studioModel, setStudioModel] = useState<string | null>(null);
+  useEffect(() => {
+    const p = projectQuery.data?.project;
+    if (!p) return;
+    setStudioMode((p.studioMode as StudioMode) ?? "agent");
+    setStudioModel(p.studioModel ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectQuery.data?.project.id]);
+  const persistPrefs = useServerFn(updateProjectStudioPrefs);
+  const onToolbarChange = (next: { mode: StudioMode; model: string | null }) => {
+    setStudioMode(next.mode);
+    setStudioModel(next.model);
+    void persistPrefs({
+      data: {
+        id: projectId,
+        studioMode: next.mode,
+        studioModel: next.model,
+      },
+    });
+  };
+
   const initialMessages: UIMessage[] = (projectQuery.data?.messages ?? []).map(
     (m) => ({
       id: m.id,
