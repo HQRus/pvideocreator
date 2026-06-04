@@ -881,12 +881,9 @@ function ChatPanel({
             ),
           )}
           {activeCard && (() => {
-            const text =
-              extractCardProse(activeCard.html) ||
-              extractCardTitle(activeCard.html);
-            return text ? (
-              <AssistantMessage key={`q-${activeCard.key}`} text={text} />
-            ) : null;
+            return (
+              <AssistantMessage key={`q-${activeCard.key}`} text={activeCard.html} />
+            );
           })()}
           {busy && (
             <Shimmer>
