@@ -774,9 +774,7 @@ function ChatPanel({
                   ? "Generating an image…"
                   : pendingTools[0] === "search_stock_media"
                     ? "Searching references…"
-                    : pendingTools[0].startsWith("pika_")
-                      ? `Rendering with Pika (${pendingTools[0]}) — usually 30–90s…`
-                      : `Running ${pendingTools[0]}…`
+                    : `Running ${pendingTools[0]}…`
                 : "Thinking…"}
             </Shimmer>
           )}
