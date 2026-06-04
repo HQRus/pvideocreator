@@ -935,3 +935,96 @@ async function finalizeReadyJobs(jobIds: string[]): Promise<void> {
     }
   }
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// listProjectRenders: return every render_job for a project, with the final
+// stitched-asset URL (signed) when available. Powers the studio "Renders"
+// tab — users can see history and retry by kicking off a fresh job.
+// ──────────────────────────────────────────────────────────────────────────
+
+export const listProjectRenders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { projectId: string }) =>
+    z.object({ projectId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const userId = context.userId;
+    // Ownership guard.
+    const { data: proj } = await supabaseAdmin
+      .from("projects")
+      .select("id")
+      .eq("id", data.projectId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!proj) throw new Error("Project not found");
+
+    const { data: jobs } = await supabaseAdmin
+      .from("render_jobs")
+      .select(
+        "id, status, error, created_at, updated_at, finished_at, final_asset_id",
+      )
+      .eq("project_id", data.projectId)
+      .order("created_at", { ascending: false });
+
+    const jobRows = jobs ?? [];
+    const assetIds = jobRows
+      .map((j) => j.final_asset_id as string | null)
+      .filter((id): id is string => !!id);
+
+    type AssetRow = {
+      id: string;
+      url: string;
+      mime: string;
+      storage_path: string | null;
+    };
+    let assetById = new Map<string, AssetRow & { signedUrl: string }>();
+    if (assetIds.length) {
+      const { data: assets } = await supabaseAdmin
+        .from("project_assets")
+        .select("id, url, mime, storage_path")
+        .in("id", assetIds);
+      const rows = (assets ?? []) as AssetRow[];
+      const signed = await signAssetUrls(rows);
+      rows.forEach((r, i) => {
+        assetById.set(r.id, { ...r, signedUrl: signed[i] ?? r.url });
+      });
+    }
+
+    // Per-job step counts for a progress summary.
+    const jobIds = jobRows.map((j) => j.id as string);
+    type StepRow = { render_job_id: string; status: string; kind: string };
+    let stepsByJob = new Map<string, StepRow[]>();
+    if (jobIds.length) {
+      const { data: steps } = await supabaseAdmin
+        .from("render_scene_outputs")
+        .select("render_job_id, status, kind")
+        .in("render_job_id", jobIds);
+      for (const s of (steps ?? []) as StepRow[]) {
+        const arr = stepsByJob.get(s.render_job_id) ?? [];
+        arr.push(s);
+        stepsByJob.set(s.render_job_id, arr);
+      }
+    }
+
+    return {
+      jobs: jobRows.map((j) => {
+        const asset = j.final_asset_id
+          ? assetById.get(j.final_asset_id as string)
+          : undefined;
+        const steps = stepsByJob.get(j.id as string) ?? [];
+        const done = steps.filter((s) => s.status === "done").length;
+        return {
+          id: j.id as string,
+          status: j.status as string,
+          error: (j.error as string | null) ?? null,
+          createdAt: j.created_at as string,
+          updatedAt: j.updated_at as string,
+          finishedAt: (j.finished_at as string | null) ?? null,
+          stepsTotal: steps.length,
+          stepsDone: done,
+          finalUrl: asset?.signedUrl ?? null,
+          finalMime: asset?.mime ?? null,
+        };
+      }),
+    };
+  });
