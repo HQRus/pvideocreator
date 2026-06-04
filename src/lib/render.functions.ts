@@ -18,6 +18,7 @@ import {
   type Scene,
 } from "@/lib/project-state";
 import { downloadAndStoreUrl } from "@/lib/project-assets.server";
+import { signAssetUrls } from "@/lib/projects.functions";
 import {
   falAnimateImage,
   falGenerateImage,
