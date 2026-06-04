@@ -89,9 +89,18 @@ function ProjectsPage() {
                 params={{ projectId: p.id }}
                 className="block"
               >
-                <div className="grid aspect-video w-full place-items-center bg-brand-gradient text-primary-foreground">
-                  <Film className="h-8 w-8" />
-                </div>
+                {p.thumbnailUrl ? (
+                  <img
+                    src={p.thumbnailUrl}
+                    alt={p.title}
+                    loading="lazy"
+                    className="aspect-video w-full object-cover"
+                  />
+                ) : (
+                  <div className="grid aspect-video w-full place-items-center bg-brand-gradient text-primary-foreground">
+                    <Film className="h-8 w-8" />
+                  </div>
+                )}
                 <div className="p-4">
                   <div className="truncate text-base font-semibold">
                     {p.title}
