@@ -11,7 +11,14 @@ import {
   updateProjectState,
   listProjects,
   createProject,
+  updateProjectStudioPrefs,
 } from "@/lib/projects.functions";
+import { directGenerate } from "@/lib/generate.functions";
+import { StudioToolbar } from "@/components/studio/studio-toolbar";
+import {
+  DEFAULT_MODEL_BY_KIND,
+  type StudioMode,
+} from "@/lib/skills";
 // "Shots" still routes through the chat AI (it asks the director to fill in
 // any missing shot images via the generate_image tool).
 // "Render final video" runs the deterministic fal.ai pipeline — no LLM.
