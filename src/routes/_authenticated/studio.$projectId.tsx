@@ -11,7 +11,14 @@ import {
   updateProjectState,
   listProjects,
   createProject,
+  updateProjectStudioPrefs,
 } from "@/lib/projects.functions";
+import { directGenerate } from "@/lib/generate.functions";
+import { StudioToolbar } from "@/components/studio/studio-toolbar";
+import {
+  DEFAULT_MODEL_BY_KIND,
+  type StudioMode,
+} from "@/lib/skills";
 // "Shots" still routes through the chat AI (it asks the director to fill in
 // any missing shot images via the generate_image tool).
 // "Render final video" runs the deterministic fal.ai pipeline — no LLM.
@@ -97,6 +104,30 @@ function Studio() {
       setProject(projectQuery.data.project.projectState);
     }
   }, [projectQuery.data?.project.id]);
+
+  // Studio toolbar state: agent | image | video | audio | speech + selected
+  // Fal model. Seeded from project columns; persisted server-side on change.
+  const [studioMode, setStudioMode] = useState<StudioMode>("agent");
+  const [studioModel, setStudioModel] = useState<string | null>(null);
+  useEffect(() => {
+    const p = projectQuery.data?.project;
+    if (!p) return;
+    setStudioMode((p.studioMode as StudioMode) ?? "agent");
+    setStudioModel(p.studioModel ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectQuery.data?.project.id]);
+  const persistPrefs = useServerFn(updateProjectStudioPrefs);
+  const onToolbarChange = (next: { mode: StudioMode; model: string | null }) => {
+    setStudioMode(next.mode);
+    setStudioModel(next.model);
+    void persistPrefs({
+      data: {
+        id: projectId,
+        studioMode: next.mode,
+        studioModel: next.model,
+      },
+    });
+  };
 
   const initialMessages: UIMessage[] = (projectQuery.data?.messages ?? []).map(
     (m) => ({
@@ -268,6 +299,9 @@ function Studio() {
             initialMessages={initialMessages}
             onPatch={handlePatch}
             assets={assets}
+            studioMode={studioMode}
+            studioModel={studioModel}
+            onToolbarChange={onToolbarChange}
             registerSender={(fn) => {
               chatSendRef.current = fn;
             }}
@@ -571,16 +605,22 @@ function ChatPanel({
   initialMessages,
   onPatch,
   assets,
+  studioMode,
+  studioModel,
+  onToolbarChange,
   registerSender,
 }: {
   projectId: string;
   initialMessages: UIMessage[];
   onPatch: (patch: ProjectPatch) => void;
   assets: ProjectAsset[];
+  studioMode: StudioMode;
+  studioModel: string | null;
+  onToolbarChange: (next: { mode: StudioMode; model: string | null }) => void;
   registerSender?: (fn: (text: string) => void) => void;
 }) {
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, setMessages, status, error } = useChat({
     id: projectId,
     messages: initialMessages,
     generateId: () =>
@@ -594,13 +634,59 @@ function ChatPanel({
     }),
   });
 
-  const busy = status === "submitted" || status === "streaming";
+  const runDirect = useServerFn(directGenerate);
+  const [directBusy, setDirectBusy] = useState(false);
+  const busy = status === "submitted" || status === "streaming" || directBusy;
 
   const handleSend = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput("");
-    await sendMessage({ text: trimmed });
+    if (studioMode === "agent") {
+      await sendMessage({ text: trimmed });
+      return;
+    }
+    // Non-agent: skip the chat agent; call the matching Fal model directly.
+    const model = studioModel ?? DEFAULT_MODEL_BY_KIND[studioMode];
+    const userId = crypto.randomUUID();
+    const assistantId = crypto.randomUUID();
+    setMessages((prev) => [
+      ...prev,
+      { id: userId, role: "user", parts: [{ type: "text", text: trimmed }] } as UIMessage,
+    ]);
+    setDirectBusy(true);
+    try {
+      const res = await runDirect({
+        data: {
+          projectId,
+          prompt: trimmed,
+          mode: studioMode,
+          model,
+          userMessageId: userId,
+          assistantMessageId: assistantId,
+        },
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          parts: [{ type: "text", text: res.assistantText }],
+        } as UIMessage,
+      ]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          parts: [{ type: "text", text: `Generation failed — ${msg}` }],
+        } as UIMessage,
+      ]);
+    } finally {
+      setDirectBusy(false);
+    }
   };
 
   // Expose our sender to the parent so the right-hand panel buttons can
@@ -825,10 +911,19 @@ function ChatPanel({
               autoFocus
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type freely…"
+              placeholder={
+                studioMode === "agent"
+                  ? "Type freely…"
+                  : `Describe the ${studioMode} you want…`
+              }
               className="text-lg"
             />
-            <PromptInputFooter className="justify-end">
+            <PromptInputFooter className="justify-between gap-2">
+              <StudioToolbar
+                mode={studioMode}
+                model={studioModel}
+                onChange={onToolbarChange}
+              />
               <PromptInputSubmit status={status} disabled={busy && !input} />
             </PromptInputFooter>
           </PromptInput>

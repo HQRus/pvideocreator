@@ -146,7 +146,10 @@ export type Database = {
           created_at: string
           id: string
           project_state: Json
+          skill: string | null
           status: string
+          studio_mode: string
+          studio_model: string | null
           title: string
           updated_at: string
           user_id: string
@@ -155,7 +158,10 @@ export type Database = {
           created_at?: string
           id?: string
           project_state?: Json
+          skill?: string | null
           status?: string
+          studio_mode?: string
+          studio_model?: string | null
           title?: string
           updated_at?: string
           user_id: string
@@ -164,7 +170,10 @@ export type Database = {
           created_at?: string
           id?: string
           project_state?: Json
+          skill?: string | null
           status?: string
+          studio_mode?: string
+          studio_model?: string | null
           title?: string
           updated_at?: string
           user_id?: string

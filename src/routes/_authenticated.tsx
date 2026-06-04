@@ -1,6 +1,12 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useRouterState,
+} from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AccountPopover } from "@/components/account-popover";
+import { AppNav } from "@/components/app-nav";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -16,10 +22,23 @@ export const Route = createFileRoute("/_authenticated")({
       });
     }
   },
-  component: () => (
-    <>
-      <Outlet />
-      <AccountPopover />
-    </>
-  ),
+  component: AuthedLayout,
 });
+
+function AuthedLayout() {
+  const pathname = useRouterState({
+    select: (s) => s.location.pathname,
+  });
+  // The studio is a fullscreen immersive surface and ships its own
+  // top chrome — don't stack the global nav on top of it.
+  const showNav = !pathname.startsWith("/studio");
+  return (
+    <div className="flex min-h-screen w-full flex-col bg-background">
+      {showNav && <AppNav />}
+      <div className="flex-1">
+        <Outlet />
+      </div>
+      <AccountPopover />
+    </div>
+  );
+}

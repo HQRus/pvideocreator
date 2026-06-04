@@ -1,71 +1,102 @@
-# Fix "Render failed: upstream request timeout"
+# Plan: Navigation, Skills, Studio controls, My Library
 
-## Root cause
+## 1. Main navigation
 
-`renderFinalVideo` (in `src/lib/render.functions.ts`) is a single server function that synchronously runs the entire pipeline inside one HTTP request:
+Add a persistent top nav inside `_authenticated.tsx` (above `<Outlet/>`) with three tabs:
 
-1. Generate a shot image for every shot (nano-banana)
-2. Animate every shot into a clip (kling-i2v)
-3. Generate a music bed (cassetteai)
-4. Generate a voiceover per shot (elevenlabs)
-5. Stitch the final MP4 (ffmpeg-compose)
+- **Projects** → existing `/projects`
+- **Skills** → new `/skills`
+- **My Library** → new `/library`
 
-For a 6-shot project that's ~6 image jobs + 6 video jobs + music + ~6 VO + 1 stitch = easily 10–20 minutes. The Cloudflare Worker / gateway in front of server functions kills the request long before that, which surfaces as **"Render failed: upstream request timeout"** even though Fal is still happily working.
+Uses TanStack `<Link>` with `activeProps` for the active state. Logo on the left, `AccountPopover` on the right (it already mounts globally — leave as is).
 
-The progress table (`render_jobs`, `render_scene_outputs`) is already in place and the studio already subscribes to it via Realtime — so we don't need a UI change, only a backend rearchitecture.
+## 2. Skills catalog (`/skills`)
 
-## Plan
+A new route showing a grid of "skills" — each one is a Fal-powered capability. Clicking a skill:
 
-### 1. Split the kickoff from the work
+1. Calls `createProject` server fn (already exists) with a skill-seeded title + a default `skill` field on the project.
+2. Navigates to `/studio/$projectId` with that skill preselected as the studio's active mode/model.
 
-Rename current `renderFinalVideo` logic into an internal helper, and replace the exported server fn with a short one that:
+### Skill registry (static, client-safe)
 
-- Validates ownership.
-- Inserts the `render_jobs` row with `status = "queued"`.
-- Seeds `render_scene_outputs` rows for every planned step (keyframe per shot missing thumb, clip per shot, music, voiceover per shot with text, final).
-- Returns `{ renderJobId }` **immediately** (well under any timeout).
+New file `src/lib/skills.ts` — a typed catalog grouped by category:
 
-The studio already navigates to / watches the job by id, so the UX stays the same: the user sees the per-step rows tick from `queued → running → done` in real time.
+```text
+Image
+  - Nano Banana (text→image)         fal-ai/nano-banana
+  - Nano Banana Edit (image edit)    fal-ai/nano-banana/edit
+  - Flux Pro 1.1                     fal-ai/flux-pro/v1.1
+  - Ideogram v2                      fal-ai/ideogram/v2
+Video
+  - Kling 2.1 (image→video)          fal-ai/kling-video/v2.1/standard/image-to-video
+  - Veo 3 (text→video)               fal-ai/veo3
+  - Luma Dream Machine               fal-ai/luma-dream-machine
+Audio / Music
+  - Cassette Music                   fal-ai/cassetteai/music-generator
+  - Stable Audio                     fal-ai/stable-audio
+Speech
+  - ElevenLabs Multilingual TTS      fal-ai/elevenlabs/tts/multilingual-v2
+  - PlayHT TTS                       fal-ai/playht/tts/v3
+```
 
-### 2. Add a tick endpoint that advances one step
+Each entry: `{ id, label, description, category, model, kind: 'image'|'video'|'audio'|'speech', icon }`.
 
-Add `src/routes/api/public/render-tick.ts` (server route, under `/api/public/*` so external schedulers can hit it without auth, but the handler validates a shared secret):
+Skills page renders category sections with cards (reuse `Card`). Card click → `createProject({ title: skill.label, skill: skill.id })` → navigate to studio.
 
-- Header check: `x-render-tick-secret` must equal `process.env.RENDER_TICK_SECRET` (new secret to add).
-- Find the oldest `render_scene_outputs` row with `status in ('queued','running')` whose `render_job_id` is on a job with `status = 'running'` or `'queued'`.
-- If found: run **exactly one** step (the existing per-step helpers in `render.functions.ts` — keyframe / clip / music / voiceover / stitch). One step at a time keeps every tick well under the timeout (each Fal job is awaited via the existing poller, but each individual stage finishes in ~30s–2min).
-- On step done: mark the row `done`, update `project_state` if it produced a scene asset, return `{ advanced: true, jobId, kind }`.
-- When no `queued/running` step remains for a job, run a finalization pass: mark the job `done` (or `failed` if any required step failed) and set `projects.status` to `ready` / `draft`.
+## 3. Project schema additions
 
-A single tick handles one step per call, so we can cap tick wall time and never time out.
+Migration adds two columns to `projects`:
 
-### 3. Drive the ticks
+- `skill text null` — the skill id selected at creation (optional)
+- (we'll keep using existing `mode` if present; otherwise add `mode text default 'agent'`)
 
-Two options, pick one in implementation:
+And the `createProject` server fn accepts optional `skill` and stores it.
 
-- **pg_cron (preferred)**: schedule a `select net.http_post(...)` every 30 seconds against `https://project--{id}.lovable.app/api/public/render-tick` with the secret header. Runs even when the user closes the tab. This is the same pattern documented in the Public API Endpoints knowledge.
-- **Client poll fallback**: from the studio, when a render is `running`, fire `fetch('/api/public/render-tick', { headers })` every 5–10 seconds. Simpler to ship first, but stops if the user closes the tab.
+## 4. Studio input toolbar
 
-We'll implement pg_cron as the canonical driver and add a lightweight client poll as a belt-and-suspenders so the first tick fires instantly.
+In `src/routes/_authenticated/studio.$projectId.tsx`, above the prompt input, add a compact toolbar row:
 
-### 4. Make individual Fal jobs survive single-tick budgets
+- **Agent mode toggle** (Switch) — when on, AI runs the multi-tool agent (current behavior). When off, the prompt goes straight to the selected mode's single-shot generator.
+- **Mode selector** — segmented control: Agent | Image | Video | Audio | Speech
+- **Model dropdown** — only shown when mode ≠ Agent. Options filtered from the skills registry by `kind`.
+- **Skills button** — opens a popover with the full skill list (same data as `/skills`); clicking one sets mode+model in place (does not create a new project).
 
-`falRun` currently polls until COMPLETED with a 10–15 minute deadline. For per-step ticks we keep that — one Fal stage is fine. The only risky one is **stitch** (`ffmpeg-compose`), which can take several minutes for long edits. It already has a 15-minute timeout in `falStitchFilm`; a single tick that's just the stitch is acceptable because the Worker per-request limit on Cloudflare paid tiers is well above that for `/api/public/*` cron-triggered requests. If we ever see stitch timeout, we can switch to Fal's webhook callback instead of polling — call it out as a follow-up, not part of this change.
+State is local to the studio for now and seeded from `project.skill` if set. Choice persists per-project via a lightweight `studio_mode` / `studio_model` column on `projects` (added in the same migration) so reloads keep the selection.
 
-### 5. Surface friendly error in the UI
+### Chat behavior wiring
 
-In the studio, when `render_jobs.status = 'failed'` show the row's `error` text instead of the generic "Render failed: upstream request timeout". That message was only accurate because the old code threw the timeout from the open HTTP request; with the new flow real Fal errors will land in `render_jobs.error`.
+`src/routes/api/chat.ts` already accepts a body; extend it to accept `mode` and `model`. When `mode !== 'agent'`, skip the tool-calling loop and call the matching helper in `fal.server.ts` directly with the user's prompt, then return the resulting asset URL as an assistant message (stored in `project_messages` and `project_assets` like today). Agent mode is unchanged.
 
-## Files to change
+## 5. My Library (`/library`)
 
-- `src/lib/render.functions.ts` — split kickoff vs. per-step; export `renderTickOnce(jobId?)` for the route to call.
-- `src/routes/api/public/render-tick.ts` — new server route, secret-gated.
-- `supabase/migrations/<ts>_render_tick_cron.sql` — enable `pg_cron` + `pg_net` if not already, and schedule the tick every 30s.
-- `src/routes/_authenticated/studio.$projectId.tsx` — keep current Realtime subscription; add a lightweight `setInterval` ping to `/api/public/render-tick` while a render is active; show `render_jobs.error` on failure.
-- New secret `RENDER_TICK_SECRET` (will prompt to add after the plan is approved).
+New route with two tabs:
 
-## What stays the same
+- **References** — all `project_assets` for this user where `kind = 'reference'` (uploaded images). Grid with thumbnails.
+- **Generations** — all `project_assets` where `kind in ('image','video','audio')` — most recent first. Each card shows the source project, mode/model, and a download/preview action.
+- **Queue** — top section listing in-flight `render_jobs` and any `render_scene_outputs` with `status in ('queued','running')` across all the user's projects, with a live realtime subscription (same pattern as studio).
 
-- The model choices (nano-banana, kling, cassetteai, elevenlabs, ffmpeg-compose).
-- The `render_jobs` / `render_scene_outputs` schema and the studio's Realtime subscription.
-- `startRender` (the shot-images-only flow) — that one is short enough to keep synchronous, though it would also benefit from the same pattern eventually.
+New server fn `listLibrary()` in `src/lib/library.functions.ts` returns `{ references, generations, queue }` scoped to `auth.uid()` via existing RLS.
+
+## Files
+
+**New**
+- `src/routes/_authenticated/skills.tsx`
+- `src/routes/_authenticated/library.tsx`
+- `src/lib/skills.ts`
+- `src/lib/library.functions.ts`
+- `src/components/app-nav.tsx`
+- `supabase/migrations/<ts>_projects_skill_mode.sql` (adds `skill`, `studio_mode`, `studio_model`)
+
+**Edited**
+- `src/routes/_authenticated.tsx` — mount `<AppNav/>`
+- `src/routes/_authenticated/studio.$projectId.tsx` — toolbar above input
+- `src/routes/api/chat.ts` — accept `mode`/`model`, route non-agent calls to Fal directly
+- `src/lib/projects.functions.ts` — `createProject` accepts `skill`, and a new `updateProjectStudioPrefs` fn
+
+## Out of scope for this turn
+
+- Persisting generation history across projects beyond what `project_assets` already gives us.
+- Building a full uploader UI for references on the Library page (we'll surface what's already uploaded). I'll add an upload button only if you confirm.
+- Per-model parameter UIs (aspect ratio, duration, voice, etc.) — for now we'll use sensible defaults; we can add per-mode controls in a follow-up.
+
+Confirm and I'll build it. If you'd like the upload button on My Library in this same pass, say so and I'll include it.

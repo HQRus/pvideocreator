@@ -121,7 +121,10 @@ export const listProjects = createServerFn({ method: "GET" })
 
 export const createProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { title?: string } | undefined) => data ?? {})
+  .inputValidator(
+    (data: { title?: string; skill?: string; studioMode?: string; studioModel?: string } | undefined) =>
+      data ?? {},
+  )
   .handler(async ({ data, context }) => {
     const userId = context.userId;
     const title = (data?.title ?? "").trim() || "Untitled project";
@@ -136,6 +139,9 @@ export const createProject = createServerFn({ method: "POST" })
         title,
         status: "draft",
         project_state: initial as unknown as never,
+        skill: data?.skill ?? null,
+        studio_mode: data?.studioMode ?? "agent",
+        studio_model: data?.studioModel ?? null,
       })
       .select("id")
       .single();
@@ -175,7 +181,7 @@ export const getProject = createServerFn({ method: "GET" })
     const userId = context.userId;
     const { data: proj, error } = await supabaseAdmin
       .from("projects")
-      .select("id, title, status, project_state, updated_at, created_at")
+      .select("id, title, status, project_state, updated_at, created_at, skill, studio_mode, studio_model")
       .eq("id", data.id)
       .eq("user_id", userId)
       .maybeSingle();
@@ -216,6 +222,9 @@ export const getProject = createServerFn({ method: "GET" })
         updatedAt: proj.updated_at,
         createdAt: proj.created_at,
         projectState,
+        skill: (proj.skill as string | null) ?? null,
+        studioMode: (proj.studio_mode as string | null) ?? "agent",
+        studioModel: (proj.studio_model as string | null) ?? null,
       },
       messages: (msgRows ?? []).map((m) => ({
         id: m.id,
@@ -224,6 +233,34 @@ export const getProject = createServerFn({ method: "GET" })
       })),
       assets,
     };
+  });
+
+// ---------- update studio toolbar prefs ----------
+
+export const updateProjectStudioPrefs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: { id: string; studioMode: string; studioModel: string | null }) =>
+      z
+        .object({
+          id: z.string().uuid(),
+          studioMode: z.enum(["agent", "image", "video", "audio", "speech"]),
+          studioModel: z.string().max(255).nullable(),
+        })
+        .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const userId = context.userId;
+    const { error } = await supabaseAdmin
+      .from("projects")
+      .update({
+        studio_mode: data.studioMode,
+        studio_model: data.studioModel,
+      })
+      .eq("id", data.id)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 // ---------- update state (patch) ----------
