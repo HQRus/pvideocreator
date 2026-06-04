@@ -744,9 +744,9 @@ export const Route = createFileRoute("/api/chat")({
         });
 
         // Keep the stream running server-side even if the client disconnects
-        // mid-flight (long Pika tool calls). Without this, onFinish never
-        // runs when the user navigates away or the network blips, and the
-        // assistant message + clip URLs are lost.
+        // mid-flight. Without this, onFinish never runs when the user
+        // navigates away or the network blips, and the assistant message is
+        // lost.
         void result.consumeStream();
 
         return response;
