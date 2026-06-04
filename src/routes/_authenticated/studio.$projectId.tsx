@@ -82,32 +82,12 @@ export const Route = createFileRoute("/_authenticated/studio/$projectId")({
 function Studio() {
   const navigate = useNavigate();
   const { projectId } = Route.useParams();
-  const [gate, setGate] = useState<"checking" | "ready">("checking");
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetchWithAuth("/api/pika/status");
-        const j = (await r.json()) as { state?: string };
-        if (cancelled) return;
-        if (j.state === "ready") setGate("ready");
-        else void navigate({ to: "/" });
-      } catch {
-        if (!cancelled) void navigate({ to: "/" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [navigate]);
-
   const fetchProject = useServerFn(getProject);
   const updateState = useServerFn(updateProjectState);
   const queryClient = useQueryClient();
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => fetchProject({ data: { id: projectId } }),
-    enabled: gate === "ready",
     staleTime: Infinity,
   });
 
@@ -192,9 +172,9 @@ function Studio() {
   const totalDuration = scenes.reduce((a, s) => a + s.duration, 0);
 
   // Subscribe to live project_state updates pushed by the render pipeline,
-  // so scene thumbnails appear as keyframes finish.
+  // so shot thumbnails appear as images finish.
   useEffect(() => {
-    if (gate !== "ready" || !projectId) return;
+    if (!projectId) return;
     const channel = supabase
       .channel(`project-${projectId}`)
       .on(
@@ -215,7 +195,7 @@ function Studio() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [projectId, gate]);
+  }, [projectId]);
 
   const handlePatch = (patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
@@ -246,10 +226,10 @@ function Studio() {
   const setScenes = (next: Scene[]) =>
     setProject((prev) => ({ ...prev, scenes: next }));
 
-  if (gate !== "ready" || projectQuery.isLoading) {
+  if (projectQuery.isLoading) {
     return (
       <div className="grid h-screen w-full place-items-center bg-background text-sm text-muted-foreground">
-        {gate !== "ready" ? "Checking Pika connection…" : "Loading project…"}
+        Loading project…
       </div>
     );
   }
