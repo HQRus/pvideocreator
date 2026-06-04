@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import symbolLogo from "@/assets/symbol.svg";
@@ -118,13 +118,18 @@ function Studio() {
     }
   }, [projectQuery.data?.project.id]);
 
-  const initialMessages: UIMessage[] = (projectQuery.data?.messages ?? []).map(
-    (m) => ({
-      id: m.id,
-      role: m.role,
-      parts: (Array.isArray(m.parts) ? m.parts : []) as UIMessage["parts"],
-    }),
-  ) as UIMessage[];
+  // Stable reference — useChat only consumes this on init; recomputing it
+  // every render forced ChatPanel to re-render on unrelated state changes
+  // (e.g. clicking a scene tile).
+  const initialMessages: UIMessage[] = useMemo(
+    () =>
+      ((projectQuery.data?.messages ?? []).map((m) => ({
+        id: m.id,
+        role: m.role,
+        parts: (Array.isArray(m.parts) ? m.parts : []) as UIMessage["parts"],
+      })) as UIMessage[]),
+    [projectQuery.data?.project.id],
+  );
 
   const [activeSceneId, setActiveSceneId] = useState<string>(
     INITIAL_PROJECT.scenes[0]?.id ?? "",
@@ -217,7 +222,7 @@ function Studio() {
     };
   }, [projectId, gate]);
 
-  const handlePatch = (patch: ProjectPatch) => {
+  const handlePatch = useCallback((patch: ProjectPatch) => {
     setProject((prev) => applyPatch(prev, patch));
     // Optimistically bump this project to the top of the panel right away.
     queryClient.setQueryData<{ projects: Array<{ id: string; updatedAt: string }> }>(
@@ -236,15 +241,28 @@ function Studio() {
     void updateState({ data: { id: projectId, patch } }).then(() => {
       void queryClient.invalidateQueries({ queryKey: ["projects-list"] });
     });
-  };
+  }, [projectId, queryClient, updateState]);
 
   // The Render / Production buttons live in the right-hand StructurePanel
   // but need to dispatch into the chat (which owns the AI SDK session).
   // We expose a ref the ChatPanel registers its sender into.
   const chatSendRef = useRef<((text: string) => void) | null>(null);
 
-  const setScenes = (next: Scene[]) =>
-    setProject((prev) => ({ ...prev, scenes: next }));
+  const setScenes = useCallback(
+    (next: Scene[]) => setProject((prev) => ({ ...prev, scenes: next })),
+    [],
+  );
+
+  const registerSender = useCallback((fn: (text: string) => void) => {
+    chatSendRef.current = fn;
+  }, []);
+  const onChatCommand = useCallback((text: string) => {
+    chatSendRef.current?.(text);
+  }, []);
+  const onTogglePanel = useCallback(
+    () => setUserPanelPref((prev) => !(hasPanelContent && (prev ?? true))),
+    [hasPanelContent],
+  );
 
   if (gate !== "ready" || projectQuery.isLoading) {
     return (
@@ -280,7 +298,7 @@ function Studio() {
           sceneCount={scenes.length}
           panelOpen={panelOpen}
           canTogglePanel={hasPanelContent}
-          onTogglePanel={() => setUserPanelPref(!panelOpen)}
+          onTogglePanel={onTogglePanel}
         />
         <div className="min-h-0 flex-1">
           <ChatPanel
@@ -288,9 +306,7 @@ function Studio() {
             initialMessages={initialMessages}
             onPatch={handlePatch}
             assets={assets}
-            registerSender={(fn) => {
-              chatSendRef.current = fn;
-            }}
+            registerSender={registerSender}
           />
         </div>
       </div>
@@ -326,7 +342,7 @@ function Studio() {
             activeSceneId={activeSceneId}
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
-            onChatCommand={(text) => chatSendRef.current?.(text)}
+            onChatCommand={onChatCommand}
           />
         </div>
       </aside>
@@ -337,7 +353,7 @@ function Studio() {
 
 // ---------- gallery rail (left, projects) ----------
 
-function FloatingGallery({
+const FloatingGallery = memo(function FloatingGallery({
   currentProjectId,
   currentTitle,
 }: {
@@ -488,7 +504,7 @@ function FloatingGallery({
       </div>
     </aside>
   );
-}
+});
 
 function ProjectAvatar({
   title,
@@ -682,7 +698,7 @@ const STARTERS = [
   "TikTok hook — fashion",
 ];
 
-function ChatPanel({
+const ChatPanel = memo(function ChatPanel({
   projectId,
   initialMessages,
   onPatch,
@@ -1006,7 +1022,7 @@ function ChatPanel({
 
     </div>
   );
-}
+});
 
 // ---------- preview panel (storyboard grid) ----------
 
@@ -1195,7 +1211,7 @@ function StatusDot({ status }: { status: Scene["status"] }) {
 
 // ---------- structure panel ----------
 
-function StructurePanel({
+const StructurePanel = memo(function StructurePanel({
   projectId,
   meta,
   scenes,
@@ -1502,7 +1518,7 @@ function StructurePanel({
       </div>
     </div>
   );
-}
+});
 
 function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
   return (
