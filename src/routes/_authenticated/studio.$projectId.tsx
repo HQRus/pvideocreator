@@ -1098,19 +1098,13 @@ function StructurePanel({
     );
     try {
       const res = await runFinal({ data: { projectId } });
-      if (res.status === "done") {
-        setRenderMsg(
-          `Final video ready${res.failed ? ` — ${res.failed} step(s) failed but film is complete.` : "."}`,
-        );
-      } else {
-        setRenderMsg(
-          `Final stitch skipped — ${res.failed} step(s) failed. Retry from the affected shot(s).`,
-        );
-      }
+      // Kickoff returns immediately; a background tick pipeline (pg_cron +
+      // client poll below) advances the job. We watch render_jobs via
+      // Realtime to flip the message to done/failed.
+      setRenderJobId(res.renderJobId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setRenderMsg(`Render failed: ${msg}`);
-    } finally {
       setRendering(false);
     }
   };
