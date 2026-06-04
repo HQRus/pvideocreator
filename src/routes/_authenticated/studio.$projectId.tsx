@@ -18,6 +18,8 @@ import { StudioToolbar } from "@/components/studio/studio-toolbar";
 import {
   DEFAULT_MODEL_BY_KIND,
   type StudioMode,
+  SKILL_BY_ID,
+  type Skill,
 } from "@/lib/skills";
 // "Shots" still routes through the chat AI (it asks the director to fill in
 // any missing shot images via the generate_image tool).
@@ -45,6 +47,9 @@ import {
   Loader2,
   History,
   RotateCw,
+  ArrowRight,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TimelinePanel } from "@/components/studio/timeline-panel";
