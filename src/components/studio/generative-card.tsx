@@ -113,6 +113,7 @@ const KIND_LABEL: Record<AssetKind, string> = {
   likeness: "selfie / likeness",
   logo: "logo",
   reference: "reference",
+  keyframe: "keyframe",
   voice: "voice sample",
   audio: "audio",
   video: "video clip",
