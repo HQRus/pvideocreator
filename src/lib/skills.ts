@@ -265,7 +265,7 @@ export const SKILLS: Skill[] = [
     description: "Warm, conversational voiceover ideal for scripted podcast intros and segments.",
     category: "Voice Apps",
     kind: "speech",
-    model: "fal-ai/playai/tts/v3",
+    model: "fal-ai/elevenlabs/tts/multilingual-v2",
     icon: MicIcon,
   },
   {
@@ -399,7 +399,7 @@ export const SKILLS: Skill[] = [
     description: "Natural conversational TTS, great for narration.",
     category: "Speech",
     kind: "speech",
-    model: "fal-ai/playai/tts/v3",
+    model: "fal-ai/elevenlabs/tts/multilingual-v2",
     icon: MicIcon,
   },
 ];
