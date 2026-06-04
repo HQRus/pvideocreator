@@ -418,7 +418,7 @@ function FloatingGallery({
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{label}</div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {isCurrent ? "Current project" : `${p.sceneCount} scene${p.sceneCount === 1 ? "" : "s"}`}
+                      {isCurrent ? "Current project" : `${p.sceneCount} shot${p.sceneCount === 1 ? "" : "s"}`}
                     </div>
                   </div>
                 </button>
@@ -533,7 +533,7 @@ function StudioTopBar({
           <div className="flex items-baseline gap-2.5 leading-tight">
             <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
             <span className="text-xs text-background/60">
-              {meta.format} · {meta.aspectRatio} · {sceneCount} scenes · {formatDuration(duration)}
+              {meta.format} · {meta.aspectRatio} · {sceneCount} shots · {formatDuration(duration)}
             </span>
           </div>
         </div>
