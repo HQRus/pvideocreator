@@ -50,6 +50,7 @@ export function StudioToolbar({ mode, model, onChange }: StudioToolbarProps) {
     mode === "agent" ? [] : SKILLS_BY_KIND(mode);
 
   const setMode = (next: StudioMode) => {
+    if (!next || !STUDIO_MODES.some((m) => m.id === next)) return;
     if (next === "agent") return onChange({ mode: "agent", model: null });
     const list = SKILLS_BY_KIND(next);
     // Preserve current model if it still applies, else default to the first.
