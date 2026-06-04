@@ -1,0 +1,1 @@
+UPDATE public.project_assets SET kind='keyframe' WHERE project_id='d4c00224-dbb6-4571-8a40-b95270de6026' AND kind='reference' AND label ~ '^Scene [0-9]+:';

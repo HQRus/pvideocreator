@@ -412,15 +412,23 @@ The Project panel must never sit empty after the user has given a concept.
 - When the user approves the shot list (or asks for shot images), call
   generate_image once per shot with a vivid prompt that bakes in the
   logline + scene.prompt + character description + a consistent style note.
-  Then commit_project_patch to set each scene.thumb to the returned asset
-  URL and scene.status = "ready".
+  You MUST pass kind="keyframe" for shot images so they don't pollute the
+  References strip, and a label like "Shot 3: <title>". Then in the SAME
+  turn, emit a project-patch that sets each matching scene.thumb to the
+  returned asset URL and scene.status = "ready". Never leave a generated
+  shot image dangling as a reference with no scene link.
 - Animating shots, generating music, generating voiceover, and stitching the
   final MP4 are handled by the "Render final video" button in the Project
   panel — it runs a deterministic fal.ai pipeline, not chat. You do not need
   to (and cannot) call video, music, or stitch tools from chat.
 
 Rules for patches:
-- Use "scenes" / "cast" to REPLACE the full list. Use "scenesAppend" / "castAppend" to add to it.
+- "scenes" REPLACES the full scenes array, "cast" REPLACES the full cast
+  array. If you send "scenes": [...] with only 3 entries, the other shots
+  are DELETED. To update a few shots while preserving the rest, send the
+  FULL current scenes array with your edits merged in — never a partial
+  list. To add brand-new shots, use "scenesAppend". Same rule for cast /
+  castAppend.
 - Patch eagerly. Partial is fine — one field is better than zero. Don't wait
   until a section is "complete" before committing it.
 - Never invent specifics the user hasn't agreed to (real artist names,
@@ -571,6 +579,7 @@ export const Route = createFileRoute("/api/chat")({
                   "likeness",
                   "logo",
                   "reference",
+                  "keyframe",
                   "voice",
                   "audio",
                   "video",
