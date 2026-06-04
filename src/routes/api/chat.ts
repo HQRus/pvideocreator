@@ -724,110 +724,23 @@ export const Route = createFileRoute("/api/chat")({
                     },
                     { onConflict: "id" },
                   );
-                // Persist pika clip URLs durably AND assign each to a scene.
-                const sceneAssignments: Array<{
-                  durableUrl: string;
-                  inputStr: string;
-                }> = [];
-                try {
-                  const toolParts = (lastAssistant.parts as Array<{
-                    type: string;
-                    state?: string;
-                    input?: unknown;
-                    output?: unknown;
-                  }>).filter(
-                    (p) =>
-                      typeof p.type === "string" &&
-                      p.type.startsWith("tool-pika_") &&
-                      p.state === "output-available",
-                  );
-                  for (const p of toolParts) {
-                    const urls = sweepVideoUrls(p.output);
-                    let inputStr = "";
-                    try {
-                      inputStr = JSON.stringify(p.input ?? {});
-                    } catch {}
-                    for (const u of urls) {
-                      try {
-                        const stored = await downloadAndStoreUrl({
-                          projectId,
-                          userId,
-                          sourceUrl: u,
-                          kind: "video",
-                          label: "Pika clip",
-                          fallbackMime: "video/mp4",
-                        });
-                        sceneAssignments.push({
-                          durableUrl: stored.url,
-                          inputStr,
-                        });
-                      } catch (e) {
-                        console.error("[chat] pika clip persist failed:", e);
-                        // Fall back to source URL so the user still sees something.
-                        sceneAssignments.push({
-                          durableUrl: u,
-                          inputStr,
-                        });
-                      }
-                    }
-                  }
-                } catch (e) {
-                  console.error("[chat] pika clip scan failed:", e);
-                }
                 // Apply embedded project patch (if any) to project_state.
                 const text = (lastAssistant.parts as Array<{ type: string; text?: string }>)
                   .filter((p) => p.type === "text")
                   .map((p) => p.text ?? "")
                   .join("");
                 const patch = extractPatchFromText(text);
-                if (patch || sceneAssignments.length) {
+                if (patch) {
                   const { data: cur } = await supabaseAdmin
                     .from("projects")
                     .select("project_state, title")
                     .eq("id", projectId)
                     .maybeSingle();
                   if (cur) {
-                    let next = applyPatch(
+                    const next = applyPatch(
                       (cur.project_state as ProjectState) ?? INITIAL_PROJECT,
                       (patch as never) ?? null,
                     );
-                    // Map pika clips onto scenes. Prefer thumb-URL match in
-                    // the tool's input args; fall back to next scene without
-                    // a clipUrl.
-                    if (sceneAssignments.length) {
-                      const scenes = next.scenes.map((s) => ({ ...s }));
-                      let cursor = 0;
-                      for (const a of sceneAssignments) {
-                        let idx = -1;
-                        if (a.inputStr) {
-                          idx = scenes.findIndex(
-                            (s) =>
-                              !s.clipUrl &&
-                              s.thumb &&
-                              a.inputStr.includes(s.thumb),
-                          );
-                        }
-                        if (idx < 0) {
-                          while (
-                            cursor < scenes.length &&
-                            scenes[cursor].clipUrl
-                          )
-                            cursor++;
-                          if (cursor < scenes.length) {
-                            idx = cursor;
-                            cursor++;
-                          }
-                        }
-                        if (idx >= 0) {
-                          scenes[idx] = {
-                            ...scenes[idx],
-                            clipUrl: a.durableUrl,
-                            status: "ready",
-                          };
-                        }
-                      }
-                      next = { ...next, scenes };
-                    }
                     const patchTitle = (patch as { meta?: { title?: string } })
                       ?.meta?.title;
                     const newTitle =
