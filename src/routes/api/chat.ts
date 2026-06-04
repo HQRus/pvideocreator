@@ -685,74 +685,14 @@ export const Route = createFileRoute("/api/chat")({
           }),
         };
 
-        // Merge in Pika MCP tools if the workspace has an active connection.
-        let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
-        try {
-          if ((await getStatus(userId)) === "ready") {
-            const redirectUri = callbackUrlFromRequest(request);
-            pikaClient = await openPikaMCPClient(userId, redirectUri);
-            const pikaTools = await pikaClient.tools();
-            for (const [name, t] of Object.entries(pikaTools)) {
-              if (!SAFE_PIKA_TOOL_NAMES.has(name)) {
-                continue;
-              }
-              const key = `pika_${name}`;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const original = t as any;
-              const origExec: ((args: unknown, ctx: unknown) => unknown) | undefined =
-                typeof original.execute === "function"
-                  ? original.execute.bind(original)
-                  : undefined;
-              tools[key] = origExec
-                ? {
-                    ...original,
-                    execute: async (args: unknown, ctx: unknown) => {
-                      const start = Date.now();
-                      const argSummary = JSON.stringify(args).slice(0, 400);
-                      console.log(`[pika] -> ${key} args=${argSummary}`);
-                      try {
-                        const out = await origExec(args, ctx);
-                        const urls = sweepVideoUrls(out);
-                        const ms = Date.now() - start;
-                        const outSummary = JSON.stringify(out).slice(0, 500);
-                        console.log(
-                          `[pika] <- ${key} ${ms}ms videos=${urls.length}${urls.length ? " " + urls.join(",") : ""} out=${outSummary}`,
-                        );
-                        return out;
-                      } catch (err) {
-                        const ms = Date.now() - start;
-                        console.error(`[pika] !! ${key} ${ms}ms threw`, err);
-                        throw err;
-                      }
-                    },
-                  }
-                : t;
-            }
-          }
-        } catch (err) {
-          console.error("[pika] failed to load MCP tools:", err);
-          if (pikaClient) {
-            try { await pikaClient.close(); } catch {}
-            pikaClient = null;
-          }
-        }
-
         const result = streamText({
           model,
           system: `${SYSTEM_PROMPT}\n\n${buildProjectStateContext(projectState)}`,
           tools: tools as never,
           stopWhen: stepCountIs(50) as never,
           messages: await convertToModelMessages(messages as UIMessage[]),
-          onFinish: async () => {
-            if (pikaClient) {
-              try { await pikaClient.close(); } catch {}
-            }
-          },
           onError: async ({ error }) => {
             console.error("[chat] streamText error:", error);
-            if (pikaClient) {
-              try { await pikaClient.close(); } catch {}
-            }
           },
         });
 
