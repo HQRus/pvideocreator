@@ -1,11 +1,13 @@
-// Render pipeline: generate a keyframe per scene via Lovable AI image gen,
-// upload to the project-assets bucket, write a `project_assets` row, and
-// patch the scene's `thumb` so the UI updates. Render-job + per-scene
-// progress is written to `render_jobs` / `render_scene_outputs` so the
-// studio can subscribe via Supabase Realtime.
+// Render pipeline. Two entry points:
+//   • startRender         — generate shot images (per scene missing a thumb).
+//   • renderFinalVideo    — end-to-end: ensure shot images, animate each shot,
+//                           generate a music bed, generate voiceovers, then
+//                           stitch a single MP4 with audio.
+// All generation runs through fal.ai via `src/lib/fal.server.ts`.
+// Per-step progress is written to `render_jobs` / `render_scene_outputs`
+// so the studio can subscribe via Supabase Realtime.
 
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -13,49 +15,47 @@ import {
   applyPatch,
   INITIAL_PROJECT,
   type ProjectState,
+  type Scene,
 } from "@/lib/project-state";
+import { downloadAndStoreUrl } from "@/lib/project-assets.server";
 import {
-  storeAsset,
-  downloadAndStoreUrl,
-  sweepCandidateVideoUrls,
-} from "@/lib/project-assets.server";
-import { sweepCandidateImageUrls } from "@/lib/project-assets.server";
-import {
-  callbackUrlFromRequest,
-  getStatus as getPikaStatus,
-  openPikaMCPClient,
-} from "@/lib/pika-mcp.server";
+  falAnimateImage,
+  falGenerateImage,
+  falGenerateMusic,
+  falGenerateVoiceover,
+  falStitchFilm,
+} from "@/lib/fal.server";
 
-const KEYFRAME_MODEL = "google/gemini-2.5-flash-image";
-const PIKA_KEYFRAME_MODEL = "pika:generate_image";
+const SHOT_IMAGE_MODEL = "fal/nano-banana";
+const SHOT_ANIMATE_MODEL = "fal/kling-i2v";
+const MUSIC_MODEL = "fal/cassetteai-music";
+const VO_MODEL = "fal/elevenlabs-tts";
+const COMPOSE_MODEL = "fal/ffmpeg-compose";
 
-// Pick reference image URLs that should be used to condition a scene's
-// keyframe. Strategy:
-//   1. Find cast members whose name appears in scene.prompt/title.
+// Pick reference image URLs to condition a shot's image generation.
+//   1. Find cast members whose name appears in the shot's prompt/title.
 //   2. For each, resolve cast.ref → asset.url (if asset exists).
 //   3. If no cast match, fall back to every asset of kind "likeness" so
-//      single-character "me eating sushi" projects still get the user's
-//      face applied across all frames.
+//      single-character projects still get the user's face baked in.
 function pickSceneReferenceUrls(
   state: ProjectState,
   scene: { title: string; prompt: string },
 ): string[] {
   const assetById = new Map(state.assets.map((a) => [a.id, a]));
   const haystack = `${scene.title} ${scene.prompt}`.toLowerCase();
-  const matchedUrls: string[] = [];
+  const matched: string[] = [];
   for (const c of state.cast) {
     if (!c.ref) continue;
     const asset = assetById.get(c.ref);
     if (!asset?.url) continue;
     const name = (c.name || "").trim().toLowerCase();
-    if (name && haystack.includes(name)) matchedUrls.push(asset.url);
+    if (name && haystack.includes(name)) matched.push(asset.url);
   }
-  if (matchedUrls.length > 0) return dedupe(matchedUrls);
-  // Fallback: every uploaded/generated likeness on the project.
-  const likenessUrls = state.assets
+  if (matched.length > 0) return dedupe(matched);
+  const likeness = state.assets
     .filter((a) => a.kind === "likeness" && !!a.url)
     .map((a) => a.url);
-  return dedupe(likenessUrls);
+  return dedupe(likeness);
 }
 
 function dedupe(arr: string[]): string[] {
@@ -74,180 +74,105 @@ async function ownProject(projectId: string, userId: string) {
   return data as { id: string; project_state: ProjectState | null };
 }
 
-async function gatewayKeyframe(
-  prompt: string,
-  apiKey: string,
-  referenceImageUrls: string[] = [],
-): Promise<{ b64: string; mime: string }> {
-  // Use the gateway's chat completions endpoint with an image model. It
-  // returns the image as base64 inside the assistant message. When we have
-  // reference images (likeness shots) we send them as multimodal content so
-  // the model can condition on the person's actual face.
-  const content: unknown =
-    referenceImageUrls.length === 0
-      ? `Single cinematic still frame: ${prompt}`
-      : [
-          { type: "text", text: `Single cinematic still frame: ${prompt}` },
-          ...referenceImageUrls.map((url) => ({
-            type: "image_url",
-            image_url: { url },
-          })),
-        ];
-  const res = await fetch(
-    "https://ai.gateway.lovable.dev/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: KEYFRAME_MODEL,
-        messages: [
-          { role: "user", content },
-        ],
-        modalities: ["image", "text"],
-      }),
-    },
-  );
-  if (!res.ok) {
-    throw new Error(`keyframe gen ${res.status}: ${await res.text()}`);
-  }
-  const data = (await res.json()) as {
-    choices?: Array<{
-      message?: { images?: Array<{ image_url?: { url?: string } }> };
-    }>;
-  };
-  const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-  if (!url) throw new Error("keyframe gen returned no image");
-  // The image_url is a data URL: data:image/png;base64,XXXX
-  const m = url.match(/^data:([^;]+);base64,(.+)$/);
-  if (!m) throw new Error("unexpected image_url format");
-  return { mime: m[1], b64: m[2] };
-}
-
-function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-// ─── Pika-based keyframe generation ─────────────────────────────────────
-// Pika MCP exposes `generate_image` (default provider: nano-banana-pro).
-// When the user has connected Pika we use it for keyframes instead of the
-// Lovable AI gateway so the entire pipeline runs on one provider.
-
-async function pikaGenerateImage(
-  tools: Record<string, unknown>,
-  promptText: string,
-  aspect: string,
-  referenceImageUrls: string[] = [],
-): Promise<string> {
-  const tool = tools["generate_image"] as
-    | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
-    | undefined;
-  if (!tool?.execute) throw new Error("Pika tool 'generate_image' not available");
-  const keys = schemaKeys(tool.inputSchema);
-  const args: Record<string, unknown> = {};
-  setFirst(args, keys, ["prompt", "promptText", "text", "description"], promptText);
-  setFirst(args, keys, ["aspect_ratio", "aspectRatio", "aspect"], aspect);
-  if (referenceImageUrls.length > 0) {
-    // Try array-shaped reference inputs first (nano-banana-pro style),
-    // then fall back to single-image keys.
-    const accepted = setFirst(
-      args,
-      keys,
-      [
-        "image_urls",
-        "imageUrls",
-        "images",
-        "reference_images",
-        "referenceImages",
-        "input_images",
-        "inputImages",
-        "refImages",
-      ],
-      referenceImageUrls,
-    );
-    if (!accepted) {
-      setFirst(
-        args,
-        keys,
-        ["image_url", "imageUrl", "image", "reference_image", "referenceImage"],
-        referenceImageUrls[0],
-      );
-    }
-  }
-  const out = await tool.execute(args, {});
-  let urls = sweepCandidateImageUrls(out);
-  if (urls.length === 0) {
-    const taskId = extractTaskId(out);
-    if (taskId) {
-      urls = await pollPikaTask(tools, taskId, {
-        timeoutMs: 5 * 60_000,
-        intervalMs: 4_000,
-        sweep: sweepCandidateImageUrls,
-      });
-    }
-  }
-  if (urls.length === 0) throw new Error("Pika generate_image returned no image URL");
-  return urls[0];
-}
-
 type StoredKeyframe = { id: string; url: string; model: string };
 
 async function generateAndStoreKeyframe(opts: {
   projectId: string;
   userId: string;
-  sceneId: string;
   sceneTitle: string;
   promptText: string;
   aspect: string;
-  pikaTools: Record<string, unknown> | null;
-  gatewayKey: string;
   referenceImageUrls?: string[];
 }): Promise<StoredKeyframe> {
-  const refUrls = opts.referenceImageUrls ?? [];
-  const promptWithRefHint =
-    refUrls.length > 0
-      ? `${opts.promptText}\n\nIMPORTANT: Match the exact likeness, face, hair, and identifying features of the person shown in the attached reference image(s). Keep the same person recognizable across every frame.`
+  const refs = opts.referenceImageUrls ?? [];
+  const promptWithHint =
+    refs.length > 0
+      ? `${opts.promptText}\n\nIMPORTANT: Match the exact likeness, face, hair, and identifying features of the person in the attached reference image(s). Keep them clearly recognizable.`
       : opts.promptText;
-  if (opts.pikaTools && opts.pikaTools["generate_image"]) {
-    try {
-      const url = await pikaGenerateImage(
-        opts.pikaTools,
-        promptWithRefHint,
-        opts.aspect,
-        refUrls,
-      );
-      const stored = await downloadAndStoreUrl({
-        projectId: opts.projectId,
-        userId: opts.userId,
-        sourceUrl: url,
-        kind: "keyframe",
-        label: `Keyframe — ${opts.sceneTitle}`,
-        fallbackMime: "image/png",
-      });
-      return { id: stored.id, url: stored.url, model: PIKA_KEYFRAME_MODEL };
-    } catch (err) {
-      console.warn(
-        `[render] pika generate_image failed, falling back to gateway: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
-  const { b64, mime } = await gatewayKeyframe(promptWithRefHint, opts.gatewayKey, refUrls);
-  const stored = await storeAsset({
+  const sourceUrl = await falGenerateImage({
+    prompt: promptWithHint,
+    aspect: opts.aspect,
+    referenceImageUrls: refs,
+  });
+  const stored = await downloadAndStoreUrl({
     projectId: opts.projectId,
     userId: opts.userId,
+    sourceUrl,
     kind: "keyframe",
-    mime,
-    bytes: b64ToBytes(b64),
-    label: `Keyframe — ${opts.sceneTitle}`,
-    attachedTo: opts.sceneId,
+    label: `Shot image — ${opts.sceneTitle}`,
+    fallbackMime: "image/png",
   });
-  return { id: stored.id, url: stored.url, model: KEYFRAME_MODEL };
+  return { id: stored.id, url: stored.url, model: SHOT_IMAGE_MODEL };
 }
+
+async function animateAndStoreClip(opts: {
+  projectId: string;
+  userId: string;
+  sceneTitle: string;
+  motionPrompt: string;
+  thumbUrl: string;
+  durationSeconds: number;
+  aspect: string;
+}): Promise<{ id: string; url: string }> {
+  const sourceUrl = await falAnimateImage({
+    prompt: opts.motionPrompt,
+    imageUrl: opts.thumbUrl,
+    durationSeconds: opts.durationSeconds,
+    aspect: opts.aspect,
+  });
+  const stored = await downloadAndStoreUrl({
+    projectId: opts.projectId,
+    userId: opts.userId,
+    sourceUrl,
+    kind: "video",
+    label: `Clip — ${opts.sceneTitle}`,
+    fallbackMime: "video/mp4",
+  });
+  return { id: stored.id, url: stored.url };
+}
+
+async function generateAndStoreMusic(opts: {
+  projectId: string;
+  userId: string;
+  prompt: string;
+  durationSeconds: number;
+}): Promise<{ id: string; url: string }> {
+  const sourceUrl = await falGenerateMusic({
+    prompt: opts.prompt,
+    durationSeconds: opts.durationSeconds,
+  });
+  const stored = await downloadAndStoreUrl({
+    projectId: opts.projectId,
+    userId: opts.userId,
+    sourceUrl,
+    kind: "music",
+    label: "Music bed",
+    fallbackMime: "audio/mpeg",
+  });
+  return { id: stored.id, url: stored.url };
+}
+
+async function generateAndStoreVoiceover(opts: {
+  projectId: string;
+  userId: string;
+  sceneTitle: string;
+  text: string;
+}): Promise<{ id: string; url: string }> {
+  const sourceUrl = await falGenerateVoiceover({ text: opts.text });
+  const stored = await downloadAndStoreUrl({
+    projectId: opts.projectId,
+    userId: opts.userId,
+    sourceUrl,
+    kind: "voiceover",
+    label: `Voiceover — ${opts.sceneTitle}`,
+    fallbackMime: "audio/mpeg",
+  });
+  return { id: stored.id, url: stored.url };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// startRender: generate a shot image for every scene that still has no thumb.
+// ──────────────────────────────────────────────────────────────────────────
 
 export const startRender = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -256,13 +181,13 @@ export const startRender = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.userId;
+    if (!process.env.FAL_KEY) throw new Error("Missing FAL_KEY");
     const proj = await ownProject(data.projectId, userId);
     const state = (proj.project_state ?? INITIAL_PROJECT) as ProjectState;
     if (state.scenes.length === 0) {
-      throw new Error("Add at least one scene before rendering.");
+      throw new Error("Add at least one shot before rendering.");
     }
 
-    // Create the render job up front so the UI can subscribe to it.
     const { data: jobRow, error: jobErr } = await supabaseAdmin
       .from("render_jobs")
       .insert({
@@ -275,8 +200,6 @@ export const startRender = createServerFn({ method: "POST" })
     if (jobErr || !jobRow) throw new Error(jobErr?.message ?? "job insert failed");
     const renderJobId = jobRow.id as string;
 
-    // Seed one scene-output row per scene so the UI immediately shows
-    // pending tiles.
     const seed = state.scenes.map((s) => ({
       render_job_id: renderJobId,
       scene_id: s.id,
@@ -284,7 +207,7 @@ export const startRender = createServerFn({ method: "POST" })
       kind: "keyframe",
       status: "queued",
       prompt: s.prompt,
-      model: KEYFRAME_MODEL,
+      model: SHOT_IMAGE_MODEL,
     }));
     await supabaseAdmin.from("render_scene_outputs").insert(seed);
 
@@ -293,36 +216,13 @@ export const startRender = createServerFn({ method: "POST" })
       .update({ status: "rendering", updated_at: new Date().toISOString() })
       .eq("id", data.projectId);
 
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-
-    // Open one Pika MCP client up front if connected — reuse across scenes.
-    let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
-    let pikaTools: Record<string, unknown> | null = null;
-    try {
-      if ((await getPikaStatus(userId)) === "ready") {
-        const redirectUri = callbackUrlFromRequest(getRequest());
-        pikaClient = await openPikaMCPClient(userId, redirectUri);
-        pikaTools = (await pikaClient.tools()) as Record<string, unknown>;
-      }
-    } catch (err) {
-      console.warn("[render] failed to open Pika MCP client:", err);
-      pikaClient = null;
-      pikaTools = null;
-    }
     const aspect = state.meta.aspectRatio || "16:9";
-
     let okCount = 0;
     let failCount = 0;
-    try {
     for (const scene of state.scenes) {
-      // Mark this scene output as running.
       const { data: outRow } = await supabaseAdmin
         .from("render_scene_outputs")
-        .update({
-          status: "running",
-          started_at: new Date().toISOString(),
-        })
+        .update({ status: "running", started_at: new Date().toISOString() })
         .eq("render_job_id", renderJobId)
         .eq("scene_id", scene.id)
         .eq("kind", "keyframe")
@@ -338,16 +238,12 @@ export const startRender = createServerFn({ method: "POST" })
         const stored = await generateAndStoreKeyframe({
           projectId: data.projectId,
           userId,
-          sceneId: scene.id,
           sceneTitle: scene.title,
           promptText,
           aspect,
-          pikaTools,
-          gatewayKey: key,
           referenceImageUrls,
         });
 
-        // Merge the new thumb into project_state by re-reading then patching.
         const { data: cur } = await supabaseAdmin
           .from("projects")
           .select("project_state")
@@ -393,12 +289,7 @@ export const startRender = createServerFn({ method: "POST" })
             })
             .eq("id", outId);
         }
-        console.error("[render] keyframe failed:", msg);
-      }
-    }
-    } finally {
-      if (pikaClient) {
-        try { await pikaClient.close(); } catch {}
+        console.error("[render] shot image failed:", msg);
       }
     }
 
@@ -429,6 +320,7 @@ export const retryRenderScene = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.userId;
+    if (!process.env.FAL_KEY) throw new Error("Missing FAL_KEY");
     const { data: out } = await supabaseAdmin
       .from("render_scene_outputs")
       .select("id, scene_id, prompt, render_job_id")
@@ -446,9 +338,6 @@ export const retryRenderScene = createServerFn({ method: "POST" })
     const scene = state.scenes.find((s) => s.id === (out.scene_id as string));
     if (!scene) throw new Error("Scene missing from project state");
 
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-
     await supabaseAdmin
       .from("render_scene_outputs")
       .update({
@@ -459,35 +348,14 @@ export const retryRenderScene = createServerFn({ method: "POST" })
       .eq("id", out.id as string);
 
     try {
-      let pikaClient: Awaited<ReturnType<typeof openPikaMCPClient>> | null = null;
-      let pikaTools: Record<string, unknown> | null = null;
-      try {
-        if ((await getPikaStatus(userId)) === "ready") {
-          const redirectUri = callbackUrlFromRequest(getRequest());
-          pikaClient = await openPikaMCPClient(userId, redirectUri);
-          pikaTools = (await pikaClient.tools()) as Record<string, unknown>;
-        }
-      } catch (err) {
-        console.warn("[render] retry: failed to open Pika MCP client:", err);
-      }
-      let stored;
-      try {
-        stored = await generateAndStoreKeyframe({
-          projectId: job.project_id as string,
-          userId,
-          sceneId: scene.id,
-          sceneTitle: scene.title,
-          promptText: (out.prompt as string) || scene.prompt || scene.title,
-          aspect: state.meta.aspectRatio || "16:9",
-          pikaTools,
-          gatewayKey: key,
-          referenceImageUrls: pickSceneReferenceUrls(state, scene),
-        });
-      } finally {
-        if (pikaClient) {
-          try { await pikaClient.close(); } catch {}
-        }
-      }
+      const stored = await generateAndStoreKeyframe({
+        projectId: job.project_id as string,
+        userId,
+        sceneTitle: scene.title,
+        promptText: (out.prompt as string) || scene.prompt || scene.title,
+        aspect: state.meta.aspectRatio || "16:9",
+        referenceImageUrls: pickSceneReferenceUrls(state, scene),
+      });
       const nextScenes = state.scenes.map((s) =>
         s.id === scene.id
           ? { ...s, thumb: stored.url, status: "ready" as const }
@@ -525,253 +393,367 @@ export const retryRenderScene = createServerFn({ method: "POST" })
     }
   });
 
-// ────────────────────────────────────────────────────────────────────────────
-// Production pipeline: per-scene Pika clip rendering (deterministic; no LLM).
-// ────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────────
+// renderFinalVideo: shot images → clips → music → voiceover → stitched MP4.
+// All steps run through fal.ai. Deterministic; no LLM.
+// ──────────────────────────────────────────────────────────────────────────
 
-type JsonSchema = {
-  properties?: Record<string, unknown>;
-  jsonSchema?: { properties?: Record<string, unknown> };
-};
-
-function schemaKeys(schema: unknown): Set<string> {
-  const s = (schema ?? {}) as JsonSchema;
-  const props = s.properties ?? s.jsonSchema?.properties ?? {};
-  return new Set(Object.keys(props));
+async function seedOutput(
+  renderJobId: string,
+  sceneId: string,
+  sceneN: number,
+  kind: string,
+  model: string,
+  prompt?: string | null,
+): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("render_scene_outputs")
+    .insert({
+      render_job_id: renderJobId,
+      scene_id: sceneId,
+      scene_n: sceneN,
+      kind,
+      status: "queued",
+      prompt: prompt ?? null,
+      model,
+    })
+    .select("id")
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "seedOutput failed");
+  return data.id as string;
 }
 
-function setFirst(
-  args: Record<string, unknown>,
-  keys: Set<string>,
-  candidates: string[],
-  value: unknown,
-): boolean {
-  if (value === undefined || value === null || value === "") return false;
-  for (const k of candidates) {
-    if (keys.has(k)) {
-      args[k] = value;
-      return true;
-    }
-  }
-  return false;
+async function updateOutput(id: string, patch: Record<string, unknown>) {
+  await supabaseAdmin
+    .from("render_scene_outputs")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
 }
 
-function buildPikaArgs(
-  toolName: string,
-  schema: unknown,
-  scene: {
-    title: string;
-    prompt: string;
-    motionPrompt?: string;
-    duration: number;
-    thumb?: string;
-  },
-  aspect: string,
-): Record<string, unknown> {
-  const keys = schemaKeys(schema);
-  const args: Record<string, unknown> = {};
-  const motion = (scene.motionPrompt || scene.prompt || scene.title || "").trim();
-  const dur = Math.max(1, Math.round(scene.duration || 5));
-  const safeAspect = /:/.test(aspect) ? aspect : "16:9";
-  const image = scene.thumb && /^https?:\/\//.test(scene.thumb) ? scene.thumb : "";
-
-  setFirst(args, keys, ["promptText", "prompt", "text", "description"], motion);
-  setFirst(args, keys, ["duration", "durationSeconds", "duration_seconds", "length", "seconds"], dur);
-  setFirst(args, keys, ["aspectRatio", "aspect_ratio", "aspect"], safeAspect);
-
-  if (image) {
-    if (toolName === "generate_keyframes_video") {
-      if (!setFirst(args, keys, ["keyframes", "keyframeImages", "frames", "images"], [image])) {
-        setFirst(
-          args,
-          keys,
-          ["image", "imageUrl", "image_url", "firstFrame", "first_frame", "startImage"],
-          image,
-        );
-      }
-    } else {
-      setFirst(
-        args,
-        keys,
-        ["image", "imageUrl", "image_url", "startingFrame", "starting_frame", "startImage"],
-        image,
-      );
-    }
-  }
-  return args;
+async function mergeScenes(
+  projectId: string,
+  fallback: ProjectState,
+  updater: (scenes: Scene[]) => Scene[],
+): Promise<ProjectState> {
+  const { data: cur } = await supabaseAdmin
+    .from("projects")
+    .select("project_state")
+    .eq("id", projectId)
+    .single();
+  const curState = (cur?.project_state as ProjectState) ?? fallback;
+  const nextScenes = updater(curState.scenes);
+  const nextState = applyPatch(curState, { scenes: nextScenes });
+  await supabaseAdmin
+    .from("projects")
+    .update({
+      project_state: nextState as unknown as never,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId);
+  return nextState;
 }
 
-function extractTaskId(out: unknown): string | null {
-  const seen = new Set<unknown>();
-  let found: string | null = null;
-  const visit = (v: unknown) => {
-    if (found || !v || typeof v !== "object" || seen.has(v)) return;
-    seen.add(v);
-    if (Array.isArray(v)) {
-      for (const x of v) visit(x);
-      return;
-    }
-    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-      if (found) return;
-      if (
-        typeof val === "string" &&
-        /^[a-zA-Z0-9_-]{6,}$/.test(val) &&
-        /^(task[_-]?id|taskId|id|jobId|job_id)$/i.test(k)
-      ) {
-        found = val;
-        return;
-      }
-      visit(val);
-    }
-  };
-  visit(out);
-  return found;
-}
-
-async function callPikaTool(
-  tools: Record<string, unknown>,
-  name: string,
-  args: unknown,
-): Promise<unknown> {
-  const t = tools[name] as { execute?: (a: unknown, c: unknown) => Promise<unknown> } | undefined;
-  if (!t?.execute) throw new Error(`Pika tool '${name}' not available`);
-  return await t.execute(args, {});
-}
-
-async function pollPikaTask(
-  tools: Record<string, unknown>,
-  taskId: string,
-  opts: {
-    timeoutMs: number;
-    intervalMs: number;
-    sweep?: (out: unknown) => string[];
-  },
-): Promise<string[]> {
-  const status = tools["task_status"] as
-    | { execute?: (a: unknown, c: unknown) => Promise<unknown>; inputSchema?: unknown }
-    | undefined;
-  if (!status?.execute) return [];
-  const keys = schemaKeys(status.inputSchema);
-  const args: Record<string, unknown> = {};
-  setFirst(args, keys, ["taskId", "task_id", "id", "jobId", "job_id"], taskId);
-
-  const sweep = opts.sweep ?? sweepCandidateVideoUrls;
-  const deadline = Date.now() + opts.timeoutMs;
-  let lastOut: unknown = null;
-  while (Date.now() < deadline) {
-    lastOut = await status.execute(args, {});
-    const urls = sweep(lastOut);
-    if (urls.length) return urls;
-    const txt = JSON.stringify(lastOut ?? {}).toLowerCase();
-    if (/("?status"?\s*:\s*"?(failed|error|cancell?ed))/i.test(txt)) {
-      throw new Error(`Pika task ${taskId} ended without a video URL`);
-    }
-    await new Promise((r) => setTimeout(r, opts.intervalMs));
-  }
-  throw new Error(`Pika task ${taskId} timed out`);
-}
-
-export const startProduction = createServerFn({ method: "POST" })
+export const renderFinalVideo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { projectId: string }) =>
     z.object({ projectId: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const userId = context.userId;
+    if (!process.env.FAL_KEY) throw new Error("Missing FAL_KEY");
     const proj = await ownProject(data.projectId, userId);
-    const state = (proj.project_state ?? INITIAL_PROJECT) as ProjectState;
-    const pending = state.scenes.filter((s) => !s.clipUrl);
-    if (pending.length === 0) {
-      return { okCount: 0, failCount: 0, skipped: state.scenes.length };
+    let state = (proj.project_state ?? INITIAL_PROJECT) as ProjectState;
+    if (state.scenes.length === 0) {
+      throw new Error("Add at least one shot before rendering.");
     }
 
-    if ((await getPikaStatus(userId)) !== "ready") {
-      return { error: "pika_not_connected" as const };
+    const { data: jobRow, error: jobErr } = await supabaseAdmin
+      .from("render_jobs")
+      .insert({
+        project_id: data.projectId,
+        status: "running",
+        started_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (jobErr || !jobRow) throw new Error(jobErr?.message ?? "job insert failed");
+    const renderJobId = jobRow.id as string;
+    await supabaseAdmin
+      .from("projects")
+      .update({ status: "rendering", updated_at: new Date().toISOString() })
+      .eq("id", data.projectId);
+
+    const aspect = state.meta.aspectRatio || "16:9";
+    let failed = 0;
+
+    // ── 1) Shot images ────────────────────────────────────────────────────
+    for (const scene of state.scenes) {
+      if (scene.thumb) continue;
+      const outId = await seedOutput(
+        renderJobId,
+        scene.id,
+        scene.n,
+        "keyframe",
+        SHOT_IMAGE_MODEL,
+        scene.prompt,
+      );
+      await updateOutput(outId, { status: "running", started_at: new Date().toISOString() });
+      try {
+        const stored = await generateAndStoreKeyframe({
+          projectId: data.projectId,
+          userId,
+          sceneTitle: scene.title,
+          promptText:
+            scene.prompt?.trim() ||
+            `${state.meta.title || "Scene"} — ${scene.title}`,
+          aspect,
+          referenceImageUrls: pickSceneReferenceUrls(state, scene),
+        });
+        state = await mergeScenes(data.projectId, state, (scenes) =>
+          scenes.map((s) =>
+            s.id === scene.id
+              ? { ...s, thumb: stored.url, status: "ready" as const }
+              : s,
+          ),
+        );
+        await updateOutput(outId, {
+          status: "done",
+          asset_id: stored.id,
+          finished_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        failed++;
+        await updateOutput(outId, {
+          status: "failed",
+          error: err instanceof Error ? err.message : String(err),
+          finished_at: new Date().toISOString(),
+        });
+        console.error(`[render-final] shot image ${scene.id}:`, err);
+      }
     }
 
-    const request = getRequest();
-    const redirectUri = callbackUrlFromRequest(request);
-    const client = await openPikaMCPClient(userId, redirectUri);
+    state = ((await ownProject(data.projectId, userId)).project_state ?? state) as ProjectState;
 
-    let okCount = 0;
-    let failCount = 0;
-    try {
-      const tools = (await client.tools()) as Record<string, unknown>;
-      const aspect = state.meta.aspectRatio || "16:9";
-
-      for (const scene of pending) {
-        const toolName =
-          scene.thumb && tools["generate_keyframes_video"]
-            ? "generate_keyframes_video"
-            : "generate_video";
-        const toolEntry = tools[toolName] as { inputSchema?: unknown } | undefined;
-        if (!toolEntry) {
-          failCount++;
-          console.error(`[production] tool ${toolName} not available`);
-          continue;
-        }
-        try {
-          const args = buildPikaArgs(toolName, toolEntry.inputSchema, scene, aspect);
-          console.log(
-            `[production] -> ${toolName} scene=${scene.id} args=${JSON.stringify(args).slice(0, 400)}`,
-          );
-          let out = await callPikaTool(tools, toolName, args);
-          let urls = sweepCandidateVideoUrls(out);
-          if (urls.length === 0) {
-            const taskId = extractTaskId(out);
-            if (taskId) {
-              console.log(`[production] polling task ${taskId} for scene ${scene.id}`);
-              urls = await pollPikaTask(tools, taskId, {
-                timeoutMs: 10 * 60_000,
-                intervalMs: 5_000,
-              });
-            }
-          }
-          if (urls.length === 0) {
-            throw new Error("Pika returned no video URL");
-          }
-          const stored = await downloadAndStoreUrl({
-            projectId: data.projectId,
-            userId,
-            sourceUrl: urls[0],
-            kind: "video",
-            label: `Clip — ${scene.title}`,
-            fallbackMime: "video/mp4",
-          });
-
-          // Merge clipUrl into project_state.
-          const { data: cur } = await supabaseAdmin
-            .from("projects")
-            .select("project_state")
-            .eq("id", data.projectId)
-            .single();
-          const curState = (cur?.project_state as ProjectState) ?? state;
-          const nextScenes = curState.scenes.map((s) =>
+    // ── 2) Animate shots ──────────────────────────────────────────────────
+    for (const scene of state.scenes) {
+      if (scene.clipUrl) continue;
+      if (!scene.thumb) {
+        failed++;
+        continue;
+      }
+      const outId = await seedOutput(
+        renderJobId,
+        scene.id,
+        scene.n,
+        "clip",
+        SHOT_ANIMATE_MODEL,
+        scene.motionPrompt || scene.prompt,
+      );
+      await updateOutput(outId, { status: "running", started_at: new Date().toISOString() });
+      try {
+        const stored = await animateAndStoreClip({
+          projectId: data.projectId,
+          userId,
+          sceneTitle: scene.title,
+          motionPrompt: (scene.motionPrompt || scene.prompt || scene.title).trim(),
+          thumbUrl: scene.thumb,
+          durationSeconds: scene.duration || 5,
+          aspect,
+        });
+        state = await mergeScenes(data.projectId, state, (scenes) =>
+          scenes.map((s) =>
             s.id === scene.id
               ? { ...s, clipUrl: stored.url, status: "ready" as const }
               : s,
-          );
-          const nextState = applyPatch(curState, { scenes: nextScenes });
-          await supabaseAdmin
-            .from("projects")
-            .update({
-              project_state: nextState as unknown as never,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", data.projectId);
-          okCount++;
-          console.log(`[production] <- ${scene.id} ok ${stored.url}`);
-        } catch (err) {
-          failCount++;
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error(`[production] scene ${scene.id} failed:`, msg);
-        }
+          ),
+        );
+        await updateOutput(outId, {
+          status: "done",
+          asset_id: stored.id,
+          finished_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        failed++;
+        await updateOutput(outId, {
+          status: "failed",
+          error: err instanceof Error ? err.message : String(err),
+          finished_at: new Date().toISOString(),
+        });
+        console.error(`[render-final] animate ${scene.id}:`, err);
       }
-    } finally {
-      try {
-        await client.close();
-      } catch {}
     }
 
-    return { okCount, failCount, skipped: state.scenes.length - pending.length };
+    state = ((await ownProject(data.projectId, userId)).project_state ?? state) as ProjectState;
+    const totalDuration = state.scenes.reduce((acc, s) => acc + (s.duration || 5), 0);
+
+    // ── 3) Music bed ──────────────────────────────────────────────────────
+    let musicUrl: string | undefined;
+    if (totalDuration > 0 && state.scenes[0]) {
+      const musicBrief = state.music?.title
+        ? `${state.music.title}${state.music.artist ? ` — ${state.music.artist}` : ""}`
+        : `Cinematic instrumental score for: ${state.meta.logline || state.meta.title || "a short film"}`;
+      const outId = await seedOutput(
+        renderJobId,
+        state.scenes[0].id,
+        0,
+        "music",
+        MUSIC_MODEL,
+        musicBrief,
+      );
+      await updateOutput(outId, { status: "running", started_at: new Date().toISOString() });
+      try {
+        const stored = await generateAndStoreMusic({
+          projectId: data.projectId,
+          userId,
+          prompt: musicBrief,
+          durationSeconds: totalDuration,
+        });
+        musicUrl = stored.url;
+        await updateOutput(outId, {
+          status: "done",
+          asset_id: stored.id,
+          finished_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        await updateOutput(outId, {
+          status: "failed",
+          error: err instanceof Error ? err.message : String(err),
+          finished_at: new Date().toISOString(),
+        });
+        console.warn(`[render-final] music:`, err);
+      }
+    }
+
+    // ── 4) Voiceovers ─────────────────────────────────────────────────────
+    type VoEntry = { url: string; startSeconds: number; durationSeconds: number };
+    const voEntries: VoEntry[] = [];
+    let cursor = 0;
+    for (const scene of state.scenes) {
+      const dur = scene.duration || 5;
+      const text = (scene.voPrompt || "").trim();
+      if (text) {
+        const outId = await seedOutput(
+          renderJobId,
+          scene.id,
+          scene.n,
+          "voiceover",
+          VO_MODEL,
+          text,
+        );
+        await updateOutput(outId, { status: "running", started_at: new Date().toISOString() });
+        try {
+          const stored = await generateAndStoreVoiceover({
+            projectId: data.projectId,
+            userId,
+            sceneTitle: scene.title,
+            text,
+          });
+          voEntries.push({
+            url: stored.url,
+            startSeconds: cursor,
+            durationSeconds: dur,
+          });
+          await updateOutput(outId, {
+            status: "done",
+            asset_id: stored.id,
+            finished_at: new Date().toISOString(),
+          });
+        } catch (err) {
+          await updateOutput(outId, {
+            status: "failed",
+            error: err instanceof Error ? err.message : String(err),
+            finished_at: new Date().toISOString(),
+          });
+          console.warn(`[render-final] voiceover ${scene.id}:`, err);
+        }
+      }
+      cursor += dur;
+    }
+
+    // ── 5) Stitch ─────────────────────────────────────────────────────────
+    const clipsReady = state.scenes.every((s) => !!s.clipUrl);
+    if (!clipsReady) {
+      await supabaseAdmin
+        .from("render_jobs")
+        .update({
+          status: "failed",
+          finished_at: new Date().toISOString(),
+          error: `Some shots failed to animate; cannot stitch final video`,
+        })
+        .eq("id", renderJobId);
+      await supabaseAdmin
+        .from("projects")
+        .update({ status: "draft", updated_at: new Date().toISOString() })
+        .eq("id", data.projectId);
+      return { renderJobId, status: "incomplete" as const, failed };
+    }
+
+    const stitchOutId = await seedOutput(
+      renderJobId,
+      state.scenes[0].id,
+      0,
+      "final",
+      COMPOSE_MODEL,
+      null,
+    );
+    await updateOutput(stitchOutId, { status: "running", started_at: new Date().toISOString() });
+    let finalAssetId: string | undefined;
+    try {
+      const sourceUrl = await falStitchFilm({
+        clips: state.scenes.map((s) => ({
+          url: s.clipUrl!,
+          durationSeconds: s.duration || 5,
+        })),
+        musicUrl,
+        voiceovers: voEntries,
+      });
+      const stored = await downloadAndStoreUrl({
+        projectId: data.projectId,
+        userId,
+        sourceUrl,
+        kind: "final",
+        label: state.meta.title || "Final video",
+        fallbackMime: "video/mp4",
+      });
+      finalAssetId = stored.id;
+      await updateOutput(stitchOutId, {
+        status: "done",
+        asset_id: stored.id,
+        finished_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      await updateOutput(stitchOutId, {
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+        finished_at: new Date().toISOString(),
+      });
+      await supabaseAdmin
+        .from("render_jobs")
+        .update({
+          status: "failed",
+          finished_at: new Date().toISOString(),
+          error: err instanceof Error ? err.message : String(err),
+        })
+        .eq("id", renderJobId);
+      await supabaseAdmin
+        .from("projects")
+        .update({ status: "draft", updated_at: new Date().toISOString() })
+        .eq("id", data.projectId);
+      throw err;
+    }
+
+    await supabaseAdmin
+      .from("render_jobs")
+      .update({
+        status: "done",
+        final_asset_id: finalAssetId ?? null,
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", renderJobId);
+    await supabaseAdmin
+      .from("projects")
+      .update({ status: "ready", updated_at: new Date().toISOString() })
+      .eq("id", data.projectId);
+
+    return { renderJobId, status: "done" as const, finalAssetId, failed };
   });
