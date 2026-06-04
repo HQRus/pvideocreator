@@ -1641,6 +1641,26 @@ function SceneRow({
     </p>
   );
 
+  const voiceover = (
+    <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+        Voiceover (optional)
+      </div>
+      <textarea
+        defaultValue={scene.voPrompt ?? ""}
+        placeholder="What the narrator says during this shot…"
+        onBlur={(e) => {
+          const next = e.target.value;
+          if (next !== (scene.voPrompt ?? "")) {
+            onChange({ ...scene, voPrompt: next });
+          }
+        }}
+        rows={2}
+        className="w-full resize-none rounded-xl border border-border bg-background/60 p-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+      />
+    </div>
+  );
+
   const thumb = (
     <div
       className={`overflow-hidden rounded-xl bg-muted ${isHorizontal ? "w-full" : "w-72 shrink-0"}`}
@@ -1669,6 +1689,7 @@ function SceneRow({
           <div className="min-w-0">
             {header}
             {description}
+            {voiceover}
           </div>
         </div>
       ) : (
@@ -1677,6 +1698,7 @@ function SceneRow({
           <div className="min-w-0 flex-1">
             {header}
             {description}
+            {voiceover}
           </div>
         </div>
       )}
