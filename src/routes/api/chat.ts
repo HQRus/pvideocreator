@@ -457,8 +457,8 @@ tool returns, you MUST eventually emit ONE card as your final assistant
 message. The card is the user-facing response; tool results alone are not.
 
 - generate_image({ prompt, kind?, label?, referenceAssetIds?, referenceImageUrls? }) → asset descriptor
-  Generate a visual reference (likeness sketch, scene concept, logo idea,
-  storyboard frame, mood image). The runtime auto-attaches the returned
+  Generate a visual reference (likeness sketch, shot concept, logo idea,
+  mood image). The runtime auto-attaches the returned
   asset to project state. Reference it in your card with
   <img data-asset-ref="ast_xxx" class="..." />.
   Use it any time a picture is faster than a paragraph — confirming a
