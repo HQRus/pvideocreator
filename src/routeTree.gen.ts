@@ -13,9 +13,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
-import { Route as AuthenticatedSkillsRouteImport } from './routes/_authenticated/skills'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedAppsRouteImport } from './routes/_authenticated/apps'
 import { Route as AuthenticatedStudioIndexRouteImport } from './routes/_authenticated/studio.index'
 import { Route as ApiPublicRenderTickRouteImport } from './routes/api/public/render-tick'
 import { Route as ApiAssetIdRouteImport } from './routes/api/asset.$id'
@@ -40,11 +40,6 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedSkillsRoute = AuthenticatedSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -53,6 +48,11 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
 const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAppsRoute = AuthenticatedAppsRouteImport.update({
+  id: '/apps',
+  path: '/apps',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedStudioIndexRoute =
@@ -81,9 +81,9 @@ const AuthenticatedStudioProjectIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/apps': typeof AuthenticatedAppsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/projects': typeof AuthenticatedProjectsRoute
-  '/skills': typeof AuthenticatedSkillsRoute
   '/api/chat': typeof ApiChatRoute
   '/studio/$projectId': typeof AuthenticatedStudioProjectIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
@@ -93,9 +93,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/apps': typeof AuthenticatedAppsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/projects': typeof AuthenticatedProjectsRoute
-  '/skills': typeof AuthenticatedSkillsRoute
   '/api/chat': typeof ApiChatRoute
   '/studio/$projectId': typeof AuthenticatedStudioProjectIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
@@ -107,9 +107,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/apps': typeof AuthenticatedAppsRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
-  '/_authenticated/skills': typeof AuthenticatedSkillsRoute
   '/api/chat': typeof ApiChatRoute
   '/_authenticated/studio/$projectId': typeof AuthenticatedStudioProjectIdRoute
   '/api/asset/$id': typeof ApiAssetIdRoute
@@ -121,9 +121,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/apps'
     | '/library'
     | '/projects'
-    | '/skills'
     | '/api/chat'
     | '/studio/$projectId'
     | '/api/asset/$id'
@@ -133,9 +133,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/apps'
     | '/library'
     | '/projects'
-    | '/skills'
     | '/api/chat'
     | '/studio/$projectId'
     | '/api/asset/$id'
@@ -146,9 +146,9 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/apps'
     | '/_authenticated/library'
     | '/_authenticated/projects'
-    | '/_authenticated/skills'
     | '/api/chat'
     | '/_authenticated/studio/$projectId'
     | '/api/asset/$id'
@@ -195,13 +195,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/skills': {
-      id: '/_authenticated/skills'
-      path: '/skills'
-      fullPath: '/skills'
-      preLoaderRoute: typeof AuthenticatedSkillsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/projects': {
       id: '/_authenticated/projects'
       path: '/projects'
@@ -214,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/library'
       fullPath: '/library'
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/apps': {
+      id: '/_authenticated/apps'
+      path: '/apps'
+      fullPath: '/apps'
+      preLoaderRoute: typeof AuthenticatedAppsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/studio/': {
@@ -248,17 +248,17 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAppsRoute: typeof AuthenticatedAppsRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
-  AuthenticatedSkillsRoute: typeof AuthenticatedSkillsRoute
   AuthenticatedStudioProjectIdRoute: typeof AuthenticatedStudioProjectIdRoute
   AuthenticatedStudioIndexRoute: typeof AuthenticatedStudioIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAppsRoute: AuthenticatedAppsRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
-  AuthenticatedSkillsRoute: AuthenticatedSkillsRoute,
   AuthenticatedStudioProjectIdRoute: AuthenticatedStudioProjectIdRoute,
   AuthenticatedStudioIndexRoute: AuthenticatedStudioIndexRoute,
 }

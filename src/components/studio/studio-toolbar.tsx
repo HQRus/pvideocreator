@@ -118,14 +118,14 @@ export function StudioToolbar({ mode, model, onChange }: StudioToolbarProps) {
 
       <div className="flex-1" />
 
-      {/* Skills popover — full catalog regardless of current mode */}
+      {/* Apps popover — full catalog regardless of current mode */}
       <Popover open={skillsOpen} onOpenChange={setSkillsOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             className="flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
           >
-            <Sparkles className="h-3.5 w-3.5" /> Skills
+            <Sparkles className="h-3.5 w-3.5" /> Apps
             <ChevronDown className="h-3 w-3" />
           </button>
         </PopoverTrigger>

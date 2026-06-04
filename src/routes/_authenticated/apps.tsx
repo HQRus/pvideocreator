@@ -4,11 +4,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { createProject } from "@/lib/projects.functions";
 import { SKILLS, SKILL_CATEGORIES, type Skill } from "@/lib/skills";
 
-export const Route = createFileRoute("/_authenticated/skills")({
-  component: SkillsPage,
+export const Route = createFileRoute("/_authenticated/apps")({
+  component: AppsPage,
 });
 
-function SkillsPage() {
+function AppsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const createNew = useServerFn(createProject);
@@ -34,11 +34,11 @@ function SkillsPage() {
       <div className="mx-auto max-w-6xl">
         <header className="mb-10">
           <h1 className="font-display text-4xl font-semibold tracking-tight">
-            Skills
+            Apps
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Pick a generative skill — image, video, music, or speech — and
-            we'll spin up a fresh project tuned to it. Every skill is powered
+            Pick a generative app — image, video, music, or speech — and
+            we'll spin up a fresh project tuned to it. Every app is powered
             by Fal.
           </p>
         </header>

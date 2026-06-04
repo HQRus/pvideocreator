@@ -4,7 +4,7 @@ import { AccountPopover } from "@/components/account-popover";
 
 const NAV_ITEMS = [
   { to: "/projects", label: "Projects" },
-  { to: "/skills", label: "Skills" },
+  { to: "/apps", label: "Apps" },
   { to: "/library", label: "My Library" },
 ] as const;
 
