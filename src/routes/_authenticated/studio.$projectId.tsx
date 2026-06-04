@@ -4,7 +4,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import symbolLogo from "@/assets/symbol.svg";
+
 import { buildAuthHeaders } from "@/lib/fetch-with-auth";
 import {
   getProject,
