@@ -13,7 +13,7 @@ import {
   createProject,
   updateProjectStudioPrefs,
 } from "@/lib/projects.functions";
-import { directGenerate } from "@/lib/generate.functions";
+import { directGenerateStart, directGeneratePoll } from "@/lib/generate.functions";
 import { StudioToolbar } from "@/components/studio/studio-toolbar";
 import {
   DEFAULT_MODEL_BY_KIND,
@@ -634,7 +634,8 @@ function ChatPanel({
     }),
   });
 
-  const runDirect = useServerFn(directGenerate);
+  const runDirectStart = useServerFn(directGenerateStart);
+  const runDirectPoll = useServerFn(directGeneratePoll);
   const [directBusy, setDirectBusy] = useState(false);
   const busy = status === "submitted" || status === "streaming" || directBusy;
 
@@ -656,7 +657,7 @@ function ChatPanel({
     ]);
     setDirectBusy(true);
     try {
-      const res = await runDirect({
+      const started = await runDirectStart({
         data: {
           projectId,
           prompt: trimmed,
@@ -666,12 +667,45 @@ function ChatPanel({
           assistantMessageId: assistantId,
         },
       });
+      if (!started.ok) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: "assistant",
+            parts: [{ type: "text", text: started.assistantText }],
+          } as UIMessage,
+        ]);
+        return;
+      }
+      // Poll fal queue until done (or ~10 min cap).
+      const deadline = Date.now() + 10 * 60_000;
+      let finalText: string | null = null;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const tick = await runDirectPoll({
+          data: {
+            projectId,
+            mode: studioMode,
+            model,
+            prompt: trimmed,
+            assistantMessageId: assistantId,
+            statusUrl: started.statusUrl,
+            responseUrl: started.responseUrl,
+          },
+        });
+        if (tick.status === "done") {
+          finalText = tick.assistantText ?? "Done.";
+          break;
+        }
+      }
+      if (!finalText) finalText = "Generation timed out — please try again.";
       setMessages((prev) => [
         ...prev,
         {
           id: assistantId,
           role: "assistant",
-          parts: [{ type: "text", text: res.assistantText }],
+          parts: [{ type: "text", text: finalText }],
         } as UIMessage,
       ]);
     } catch (err) {
