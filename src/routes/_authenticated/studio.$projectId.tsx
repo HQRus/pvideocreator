@@ -43,7 +43,8 @@ import {
   Maximize2,
   FolderOpen,
   Loader2,
-
+  History,
+  RotateCw,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TimelinePanel } from "@/components/studio/timeline-panel";
