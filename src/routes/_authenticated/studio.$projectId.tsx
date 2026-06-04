@@ -12,9 +12,10 @@ import {
   listProjects,
   createProject,
 } from "@/lib/projects.functions";
-// "Generate keyframes" still routes through the chat AI (image gen tools).
-// "Go to production" runs the deterministic server pipeline below — no LLM.
-import { startProduction } from "@/lib/render.functions";
+// "Shots" still routes through the chat AI (it asks the director to fill in
+// any missing shot images via the generate_image tool).
+// "Render final video" runs the deterministic fal.ai pipeline — no LLM.
+import { renderFinalVideo } from "@/lib/render.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Play,
@@ -27,7 +28,6 @@ import {
   Users,
   Music2,
   Clock,
-  GripVertical,
   Plus,
   ImagePlus,
   Wand2,
@@ -1230,12 +1230,12 @@ function StructurePanel({
 }) {
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
-  const runProduction = useServerFn(startProduction);
-  const missingKeyframes = scenes.filter((s) => !s.thumb).length;
+  const runFinal = useServerFn(renderFinalVideo);
+  const missingShotImages = scenes.filter((s) => !s.thumb).length;
   const missingClips = scenes.filter((s) => !s.clipUrl).length;
-  const onGenerateKeyframes = () => {
+  const onGenerateShotImages = () => {
     if (scenes.length === 0) {
-      setRenderMsg("Draft at least one scene first — describe the concept in chat.");
+      setRenderMsg("Draft at least one shot first — describe the concept in chat.");
       return;
     }
     const likenessAssetIds = Array.from(
@@ -1244,38 +1244,37 @@ function StructurePanel({
         ...assets.filter((a) => a.kind === "likeness").map((a) => a.id),
       ]),
     );
-    setRenderMsg("Asked the director to generate keyframes.");
+    setRenderMsg("Asked the director to generate shot images.");
     onChatCommand?.(
-      `GENERATE KEYFRAMES NOW for every scene that doesn't already have one. ` +
-      `For each such scene, call the generate_image tool with a vivid, cinematic prompt that bakes in: ` +
-      `(1) the project logline, (2) the scene title + scene prompt, (3) the cast notes & any uploaded ` +
-      `likeness/reference assets, and (4) a consistent visual style across all keyframes. ` +
+      `GENERATE SHOT IMAGES NOW for every shot that doesn't already have one. ` +
+      `For each such shot, call the generate_image tool with a vivid, cinematic prompt that bakes in: ` +
+      `(1) the project logline, (2) the shot title + shot prompt, (3) the cast notes & any uploaded ` +
+      `likeness/reference assets, and (4) a consistent visual style across all shots. ` +
       `${likenessAssetIds.length ? `Use referenceAssetIds=${JSON.stringify(likenessAssetIds)} anywhere the user or cast should appear so their face is actually used in generation. ` : ""}` +
       `After each image returns, emit a commit_project_patch that updates scenes[i].thumb to the new ` +
-      `asset URL (and sets status to "ready"). Do all scenes in this turn. Final card: a short handoff ` +
-      `confirming how many keyframes were generated.`,
+      `asset URL (and sets status to "ready"). Do all shots in this turn. Final card: a short handoff ` +
+      `confirming how many shot images were generated.`,
     );
   };
-  const onGoToProduction = async () => {
+  const onRenderFinal = async () => {
     if (scenes.length === 0) {
-      setRenderMsg("Draft at least one scene first.");
-      return;
-    }
-    if (missingClips === 0) {
-      setRenderMsg("Every scene already has a clip. Nothing to render.");
+      setRenderMsg("Draft at least one shot first.");
       return;
     }
     setRendering(true);
-    setRenderMsg(`Rendering ${missingClips} scene${missingClips === 1 ? "" : "s"} via Pika…`);
+    setRenderMsg(
+      `Rendering final video — generating any missing shot images, animating shots, scoring music, recording voiceover, then stitching. This can take several minutes.`,
+    );
     try {
-      const res = await runProduction({ data: { projectId } });
-      if ("error" in res && res.error === "pika_not_connected") {
-        setRenderMsg("Pika isn't connected. Connect Pika from the header to render clips.");
-      } else if ("okCount" in res) {
-        const parts: string[] = [];
-        if (res.okCount) parts.push(`${res.okCount} rendered`);
-        if (res.failCount) parts.push(`${res.failCount} failed`);
-        setRenderMsg(parts.join(" · ") || "Nothing to render.");
+      const res = await runFinal({ data: { projectId } });
+      if (res.status === "done") {
+        setRenderMsg(
+          `Final video ready${res.failed ? ` — ${res.failed} step(s) failed but film is complete.` : "."}`,
+        );
+      } else {
+        setRenderMsg(
+          `Final stitch skipped — ${res.failed} step(s) failed. Retry from the affected shot(s).`,
+        );
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
