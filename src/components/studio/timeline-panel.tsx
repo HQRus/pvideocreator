@@ -536,3 +536,4 @@ function fmt(t: number) {
   const rem = s % 60;
   return `${m}:${rem.toString().padStart(2, "0")}`;
 }
+export const TimelinePanel = memo(TimelinePanelImpl);
