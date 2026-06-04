@@ -1,5 +1,5 @@
-import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import symbolLogo from "@/assets/symbol.svg";
 
 export function BrandMark({ className }: { className?: string }) {
   return (
@@ -9,7 +9,11 @@ export function BrandMark({ className }: { className?: string }) {
         className,
       )}
     >
-      <Play className="h-4 w-4 fill-primary-foreground text-primary-foreground" />
+      <img
+        src={symbolLogo}
+        alt="Pika X"
+        className="h-[14px] w-auto brightness-0 invert"
+      />
     </span>
   );
 }
