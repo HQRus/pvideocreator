@@ -571,7 +571,7 @@ export const Route = createFileRoute("/api/chat")({
         const tools: Record<string, unknown> = {
           generate_image: tool({
             description:
-              "Generate a single reference image (mood, character, scene, logo). Returns an asset descriptor already attached to project state.",
+              "Generate a single image (mood, character, shot keyframe, logo). Returns an asset descriptor already attached to project state. Pass sceneId when generating an image FOR a specific shot — it will be stored as a keyframe and auto-linked to that shot's thumb.",
             inputSchema: z.object({
               prompt: z.string().min(3).max(800),
               kind: z
@@ -587,11 +587,19 @@ export const Route = createFileRoute("/api/chat")({
                 ])
                 .optional(),
               label: z.string().max(120).optional(),
+              sceneId: z.string().min(1).max(120).optional(),
               referenceAssetIds: z.array(z.string().min(1).max(120)).max(8).optional(),
               referenceImageUrls: z.array(z.string().url()).max(8).optional(),
             }),
-            execute: async ({ prompt, kind, label, referenceAssetIds, referenceImageUrls }) => {
+            execute: async ({ prompt, kind, label, sceneId, referenceAssetIds, referenceImageUrls }) => {
               try {
+                // When the agent is generating an image FOR a specific shot,
+                // force kind=keyframe so it stays out of the References strip,
+                // and we'll auto-patch scene.thumb/status below.
+                const matchedScene = sceneId
+                  ? projectState.scenes.find((s) => s.id === sceneId)
+                  : undefined;
+                const effectiveKind = matchedScene ? "keyframe" : (kind ?? "reference");
                 const resolvedReferenceUrls = Array.from(
                   new Set([
                     ...(referenceAssetIds ?? []).map((id) => assetUrlById.get(id) ?? ""),
@@ -613,17 +621,27 @@ export const Route = createFileRoute("/api/chat")({
                     projectId,
                     userId,
                     sourceUrl,
-                    kind: kind ?? "reference",
+                    kind: effectiveKind,
                     label,
                     fallbackMime: "image/png",
                   });
                   return {
                     id: stored.id,
-                    kind: kind ?? "reference",
+                    kind: effectiveKind,
                     mime: stored.mime,
                     name: (label ?? prompt.slice(0, 40)) + ".png",
                     url: stored.url,
                     label,
+                    // If wired to a shot, ship a partial scenes patch so the
+                    // client commits scene.thumb + status without relying on
+                    // the agent emitting a second JSON patch.
+                    patch: matchedScene
+                      ? {
+                          scenes: [
+                            { id: matchedScene.id, thumb: stored.url, status: "ready" },
+                          ],
+                        }
+                      : undefined,
                   };
                 } catch (e) {
                   console.error("[chat] downloadAndStoreUrl failed:", e);
