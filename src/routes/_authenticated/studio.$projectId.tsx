@@ -279,7 +279,7 @@ function Studio() {
   }
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-background p-10 text-foreground">
+    <div className="relative h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-background p-10 text-foreground">
       {/* Centered chat fills the screen; gallery & project panel float over it */}
       <div
         ref={chatShellRef}
