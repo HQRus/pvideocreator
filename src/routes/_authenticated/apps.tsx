@@ -37,9 +37,10 @@ function AppsPage() {
             Apps
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Pick a generative app — image, video, music, or speech — and
-            we'll spin up a fresh project tuned to it. Every app is powered
-            by Fal.
+            Pick an app — curated creative use-cases like Character Swap,
+            Background Swap, Animate-a-Photo — or jump straight to a raw
+            model. Each one spins up a fresh project tuned for the job.
+            Powered by Fal.
           </p>
         </header>
 
