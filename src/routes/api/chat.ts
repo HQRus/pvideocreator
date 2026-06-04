@@ -12,13 +12,8 @@ import { putAsset, base64ToBytes } from "@/lib/asset-cache.server";
 import {
   storeAsset,
   downloadAndStoreUrl,
-  sweepCandidateVideoUrls,
 } from "@/lib/project-assets.server";
-import {
-  callbackUrlFromRequest,
-  getStatus,
-  openPikaMCPClient,
-} from "@/lib/pika-mcp.server";
+import { falGenerateImage } from "@/lib/fal.server";
 import { requireUser, unauthorizedResponse } from "@/lib/auth-route.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { applyPatch, INITIAL_PROJECT, type ProjectState } from "@/lib/project-state";
@@ -29,10 +24,7 @@ let _toolAssetCounter = 0;
 const nextToolAssetId = () =>
   `ast_t${Date.now().toString(36)}${(++_toolAssetCounter).toString(36)}`;
 
-// Walk an arbitrary value for video-ish URLs (used to summarize Pika output in logs).
-const sweepVideoUrls = sweepCandidateVideoUrls;
-
-const CHAT_IMAGE_MODEL = "google/gemini-2.5-flash-image";
+const CHAT_IMAGE_MODEL = "fal/nano-banana";
 
 function truncateLine(value: string, max = 220): string {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
@@ -87,81 +79,7 @@ function buildProjectStateContext(state: ProjectState | null | undefined): strin
   ].join("\n");
 }
 
-async function gatewayGenerateImage(
-  prompt: string,
-  apiKey: string,
-  referenceImageUrls: string[] = [],
-): Promise<{ b64: string; mime: string }> {
-  if (referenceImageUrls.length > 0) {
-    const res = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: CHAT_IMAGE_MODEL,
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: prompt },
-                ...referenceImageUrls.map((url) => ({
-                  type: "image_url",
-                  image_url: { url },
-                })),
-              ],
-            },
-          ],
-          modalities: ["image", "text"],
-        }),
-      },
-    );
-    if (!res.ok) {
-      throw new Error(`Image gateway error ${res.status}: ${await res.text()}`);
-    }
-    const data = (await res.json()) as {
-      choices?: Array<{
-        message?: { images?: Array<{ image_url?: { url?: string } }> };
-      }>;
-    };
-    const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!url) throw new Error("Image gateway returned no image");
-    const match = url.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) throw new Error("unexpected image_url format");
-    return { mime: match[1], b64: match[2] };
-  }
-  const res = await fetch(
-    "https://ai.gateway.lovable.dev/v1/images/generations",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-image-2",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "low",
-      }),
-    },
-  );
-  if (!res.ok) {
-    throw new Error(`Image gateway error ${res.status}: ${await res.text()}`);
-  }
-  const data = (await res.json()) as {
-    data?: Array<{ b64_json?: string; url?: string }>;
-  };
-  const first = data.data?.[0];
-  if (first?.b64_json) {
-    return { b64: first.b64_json, mime: "image/png" };
-  }
-  throw new Error("Image gateway returned no image");
-}
+// Image generation flows through fal nano-banana via `falGenerateImage`.
 
 const STOCK_LIBRARY: Array<{ tags: string[]; url: string; label: string }> = [
   {
