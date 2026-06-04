@@ -303,6 +303,10 @@ function Studio() {
             onPatch={handlePatch}
             assets={assets}
             studioMode={studioMode}
+            projectMode={
+              (projectQuery.data?.project.studioMode as StudioMode | undefined) ||
+              "agent"
+            }
             studioModel={studioModel}
             onToolbarChange={onToolbarChange}
             registerSender={(fn) => {
@@ -609,6 +613,7 @@ function ChatPanel({
   onPatch,
   assets,
   studioMode,
+  projectMode,
   studioModel,
   onToolbarChange,
   registerSender,
@@ -618,6 +623,7 @@ function ChatPanel({
   onPatch: (patch: ProjectPatch) => void;
   assets: ProjectAsset[];
   studioMode: StudioMode;
+  projectMode: StudioMode;
   studioModel: string | null;
   onToolbarChange: (next: { mode: StudioMode; model: string | null }) => void;
   registerSender?: (fn: (text: string) => void) => void;
@@ -923,7 +929,7 @@ function ChatPanel({
               />
             </div>
           )}
-          {!busy && !activeCard && history.length === 0 && studioMode === "agent" && (
+          {!busy && !activeCard && history.length === 0 && projectMode === "agent" && (
             <div className="mb-4 flex flex-wrap gap-2">
               {STARTERS.map((s) => (
                 <button
