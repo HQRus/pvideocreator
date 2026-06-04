@@ -929,7 +929,7 @@ function ChatPanel({
               />
             </div>
           )}
-          {!busy && !activeCard && history.length === 0 && studioMode === "agent" && (
+          {!busy && !activeCard && history.length === 0 && projectMode === "agent" && (
             <div className="mb-4 flex flex-wrap gap-2">
               {STARTERS.map((s) => (
                 <button
