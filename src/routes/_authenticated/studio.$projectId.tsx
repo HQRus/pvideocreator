@@ -1559,7 +1559,7 @@ function TechSpecs({
   const specs: { label: string; value: string }[] = [
     { label: "Aspect", value: clean(meta.aspectRatio) || "—" },
     { label: "Length", value: length || "—" },
-    { label: "Scenes", value: sceneCount > 0 ? String(sceneCount) : "—" },
+    { label: "Shots", value: sceneCount > 0 ? String(sceneCount) : "—" },
     { label: "FPS", value: clean(meta.fps) || "—" },
     { label: "Resolution", value: clean(meta.resolution) || "—" },
   ];
