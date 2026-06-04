@@ -344,6 +344,7 @@ function Studio() {
             onSelect={setActiveSceneId}
             totalDuration={totalDuration}
             onChatCommand={(text) => chatSendRef.current?.(text)}
+            studioMode={studioMode}
           />
         </div>
       </aside>
@@ -922,7 +923,7 @@ function ChatPanel({
               />
             </div>
           )}
-          {!busy && !activeCard && history.length === 0 && (
+          {!busy && !activeCard && history.length === 0 && studioMode === "agent" && (
             <div className="mb-4 flex flex-wrap gap-2">
               {STARTERS.map((s) => (
                 <button
@@ -933,6 +934,11 @@ function ChatPanel({
                   {s}
                 </button>
               ))}
+            </div>
+          )}
+          {!busy && studioMode !== "agent" && history.length > 0 && (
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Create another
             </div>
           )}
           <PromptInput
@@ -1166,6 +1172,7 @@ function StructurePanel({
   onSelect,
   totalDuration,
   onChatCommand,
+  studioMode,
 }: {
   projectId: string;
   meta: {
@@ -1186,6 +1193,7 @@ function StructurePanel({
   onSelect: (id: string) => void;
   totalDuration: number;
   onChatCommand?: (text: string) => void;
+  studioMode: StudioMode;
 }) {
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -1294,29 +1302,46 @@ function StructurePanel({
   };
   return (
     <div className="relative flex h-full flex-col">
-      <Tabs defaultValue="shots" className="flex h-full flex-col">
+      <Tabs
+        defaultValue={studioMode === "agent" ? "shots" : "gallery"}
+        className="flex h-full flex-col"
+      >
         <div className="px-8 pt-8">
           <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground">
             {meta.title}
           </h2>
-          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-            {meta.logline ||
-              "Your video's overview will appear here and evolve as you make decisions in the chat."}
-          </p>
-          <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
-          {assets.filter((a) => a.kind !== "keyframe").length > 0 && (
-            <AssetsStrip assets={assets.filter((a) => a.kind !== "keyframe")} />
+          {studioMode === "agent" ? (
+            <>
+              <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+                {meta.logline ||
+                  "Your video's overview will appear here and evolve as you make decisions in the chat."}
+              </p>
+              <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
+              {assets.filter((a) => a.kind !== "keyframe").length > 0 && (
+                <AssetsStrip assets={assets.filter((a) => a.kind !== "keyframe")} />
+              )}
+            </>
+          ) : (
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+              Every generation from this app collects here.
+            </p>
           )}
         </div>
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
-            {[
-              { v: "shots", icon: Film, label: "Shots" },
-              { v: "cast", icon: Users, label: "Cast" },
-              { v: "music", icon: Music2, label: "Audio" },
-              { v: "timeline", icon: ListVideo, label: "Timeline" },
-              { v: "renders", icon: History, label: "Renders" },
-            ].map(({ v, icon: Icon, label }) => (
+            {(studioMode === "agent"
+              ? [
+                  { v: "shots", icon: Film, label: "Shots" },
+                  { v: "cast", icon: Users, label: "Cast" },
+                  { v: "music", icon: Music2, label: "Audio" },
+                  { v: "timeline", icon: ListVideo, label: "Timeline" },
+                  { v: "renders", icon: History, label: "Renders" },
+                ]
+              : [
+                  { v: "gallery", icon: LayoutGrid, label: "Gallery" },
+                  { v: "renders", icon: History, label: "Renders" },
+                ]
+            ).map(({ v, icon: Icon, label }) => (
               <TabsTrigger
                 key={v}
                 value={v}
@@ -1327,6 +1352,12 @@ function StructurePanel({
             ))}
           </TabsList>
         </div>
+
+        {studioMode !== "agent" && (
+          <TabsContent value="gallery" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
+            <GalleryGrid assets={assets} />
+          </TabsContent>
+        )}
 
         <TabsContent value="shots" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
@@ -1478,6 +1509,7 @@ function StructurePanel({
       </Tabs>
 
       {/* Floating sticky action bar */}
+      {studioMode === "agent" && (
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-12 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="pointer-events-auto flex items-center gap-3 rounded-3xl border border-border/60 bg-card/90 p-3 shadow-elegant backdrop-blur-xl">
           <button
@@ -1511,6 +1543,7 @@ function StructurePanel({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -1522,6 +1555,61 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
         {icon}
       </div>
       <div className="max-w-[260px] text-base font-medium leading-relaxed text-muted-foreground">{text}</div>
+    </div>
+  );
+}
+
+// ---------- gallery (app-mode: all generations) ----------
+
+const GENERATION_KINDS = new Set([
+  "image",
+  "video",
+  "audio",
+  "music",
+  "voiceover",
+  "keyframe",
+  "final",
+]);
+
+function GalleryGrid({ assets }: { assets: ProjectAsset[] }) {
+  const items = assets.filter((a) => GENERATION_KINDS.has(a.kind));
+  if (items.length === 0) {
+    return (
+      <EmptyHint
+        icon={<LayoutGrid className="h-8 w-8" />}
+        text="No generations yet — describe what you want in the chat to create your first one."
+      />
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {items
+        .slice()
+        .reverse()
+        .map((a) => (
+          <a
+            key={a.id}
+            href={a.url}
+            target="_blank"
+            rel="noreferrer"
+            className="group relative block overflow-hidden rounded-2xl border border-border/60 bg-muted/40"
+          >
+            {a.mime.startsWith("image/") && (
+              <img src={a.url} alt={a.label || a.name} className="aspect-square w-full object-cover" />
+            )}
+            {a.mime.startsWith("video/") && (
+              <video src={a.url} className="aspect-square w-full object-cover" muted playsInline />
+            )}
+            {a.mime.startsWith("audio/") && (
+              <div className="flex aspect-square w-full items-center justify-center bg-muted/60 p-3">
+                <audio src={a.url} controls className="w-full" />
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-background/90 to-transparent px-3 py-2 text-xs font-medium text-foreground opacity-0 transition group-hover:opacity-100">
+              {a.label || a.name}
+            </div>
+          </a>
+        ))}
     </div>
   );
 }
