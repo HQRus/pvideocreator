@@ -560,6 +560,7 @@ function StudioTopBar({
   meta,
   duration,
   sceneCount,
+  isAgent,
   panelOpen,
   canTogglePanel,
   onTogglePanel,
@@ -567,6 +568,7 @@ function StudioTopBar({
   meta: { title: string; format: string; aspectRatio: string };
   duration: number;
   sceneCount: number;
+  isAgent: boolean;
   panelOpen: boolean;
   canTogglePanel: boolean;
   onTogglePanel: () => void;
@@ -578,9 +580,11 @@ function StudioTopBar({
             <BrandMark className="h-7 w-7" />
           <div className="flex items-baseline gap-2.5 leading-tight">
             <span className="text-base font-semibold tracking-tight text-background">{meta.title}</span>
-            <span className="text-xs text-background/60">
-              {meta.format} · {meta.aspectRatio} · {sceneCount} shots · {formatDuration(duration)}
-            </span>
+            {isAgent && (
+              <span className="text-xs text-background/60">
+                {meta.format} · {meta.aspectRatio} · {sceneCount} shots · {formatDuration(duration)}
+              </span>
+            )}
           </div>
         </div>
       </div>
