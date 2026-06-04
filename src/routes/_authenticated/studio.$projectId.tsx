@@ -681,6 +681,7 @@ function ChatPanel({
         if (!out || out.error) continue;
         if (p.type === "tool-generate_image" && out.id && out.url) {
           onPatch({ assetsAppend: [out as ProjectAsset] });
+          if (out.patch) onPatch(out.patch as ProjectPatch);
         } else if (p.type === "tool-search_stock_media" && Array.isArray(out.assets)) {
           onPatch({ assetsAppend: out.assets });
         } else if (p.type === "tool-commit_project_patch" && out.patch) {
