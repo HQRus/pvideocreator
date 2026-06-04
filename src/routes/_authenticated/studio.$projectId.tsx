@@ -1286,7 +1286,7 @@ function StructurePanel({
   };
   return (
     <div className="relative flex h-full flex-col">
-      <Tabs defaultValue="storyboard" className="flex h-full flex-col">
+      <Tabs defaultValue="shots" className="flex h-full flex-col">
         <div className="px-8 pt-8">
           <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground">
             {meta.title}
@@ -1301,8 +1301,7 @@ function StructurePanel({
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
             {[
-              { v: "storyboard", icon: LayoutGrid, label: "Storyboard" },
-              { v: "scenes", icon: Film, label: "Scenes" },
+              { v: "shots", icon: Film, label: "Shots" },
               { v: "cast", icon: Users, label: "Cast" },
               { v: "music", icon: Music2, label: "Audio" },
               { v: "timeline", icon: ListVideo, label: "Timeline" },
@@ -1318,25 +1317,17 @@ function StructurePanel({
           </TabsList>
         </div>
 
-        <TabsContent value="storyboard" className="m-0 flex-1 overflow-hidden">
-          <PreviewPanel
-            scenes={scenes}
-            activeSceneId={activeSceneId}
-            onSelect={onSelect}
-            totalDuration={totalDuration}
-          />
-        </TabsContent>
-
-        <TabsContent value="scenes" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
+        <TabsContent value="shots" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
           <div className="space-y-5">
             {scenes.length === 0 && (
-              <EmptyHint icon={<Film className="h-8 w-8" />} text="Scenes will appear as you build out the storyboard." />
+              <EmptyHint icon={<Film className="h-8 w-8" />} text="Shots will appear as you build out your video with the director." />
             )}
             {scenes.map((s) => (
               <SceneRow
                 key={s.id}
                 scene={s}
                 active={s.id === activeSceneId}
+                aspectRatio={meta.aspectRatio}
                 onClick={() => onSelect(s.id)}
                 onChange={(next) =>
                   setScenes(scenes.map((x) => (x.id === next.id ? next : x)))
@@ -1344,7 +1335,7 @@ function StructurePanel({
               />
             ))}
             <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card/30 py-5 text-base font-semibold text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground">
-              <Plus className="h-5 w-5" /> Add scene
+              <Plus className="h-5 w-5" /> Add shot
             </button>
           </div>
         </TabsContent>
@@ -1568,7 +1559,7 @@ function TechSpecs({
   const specs: { label: string; value: string }[] = [
     { label: "Aspect", value: clean(meta.aspectRatio) || "—" },
     { label: "Length", value: length || "—" },
-    { label: "Scenes", value: sceneCount > 0 ? String(sceneCount) : "—" },
+    { label: "Shots", value: sceneCount > 0 ? String(sceneCount) : "—" },
     { label: "FPS", value: clean(meta.fps) || "—" },
     { label: "Resolution", value: clean(meta.resolution) || "—" },
   ];
@@ -1594,15 +1585,23 @@ function TechSpecs({
 function SceneRow({
   scene,
   active,
+  aspectRatio,
   onClick,
   onChange,
 }: {
   scene: Scene;
   active: boolean;
+  aspectRatio?: string;
   onClick: () => void;
   onChange: (s: Scene) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  // Parse "W:H" → aspect-ratio CSS value. Default to 16:9 if missing/invalid.
+  const ar = (() => {
+    const m = (aspectRatio || "").match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+    if (!m) return "16 / 9";
+    return `${m[1]} / ${m[2]}`;
+  })();
   return (
     <div
       onClick={onClick}
@@ -1610,19 +1609,24 @@ function SceneRow({
         active ? "border-primary/60 shadow-glow" : "border-border/60 hover:border-foreground/30"
       }`}
     >
-      <div className="flex gap-4">
+      <div className="flex items-start gap-4">
         <GripVertical className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50" />
-        {scene.thumb ? (
-          <img
-            src={scene.thumb}
-            alt=""
-            className="h-20 w-14 shrink-0 rounded-xl object-cover"
-          />
-        ) : (
-          <div className="grid h-20 w-14 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground/50">
-            <Film className="h-5 w-5" />
-          </div>
-        )}
+        <div
+          className="w-72 shrink-0 overflow-hidden rounded-xl bg-muted"
+          style={{ aspectRatio: ar }}
+        >
+          {scene.thumb ? (
+            <img
+              src={scene.thumb}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center text-muted-foreground/50">
+              <Film className="h-7 w-7" />
+            </div>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -1641,7 +1645,7 @@ function SceneRow({
                 onChange({ ...scene, prompt: e.target.value });
                 setEditing(false);
               }}
-              rows={3}
+              rows={5}
               className="mt-3 w-full resize-none rounded-xl border border-border bg-background/60 p-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
             />
           ) : (
@@ -1650,7 +1654,7 @@ function SceneRow({
                 e.stopPropagation();
                 setEditing(true);
               }}
-              className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground hover:text-foreground"
+              className="mt-2 text-sm leading-relaxed text-muted-foreground hover:text-foreground"
             >
               {scene.prompt}
             </p>
