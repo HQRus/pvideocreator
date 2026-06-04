@@ -402,21 +402,21 @@ The Project panel must never sit empty after the user has given a concept.
   later keyframe generation can stay visually consistent.
 - Uploaded assets in user messages also include a "url=https://..." which
   is the durable signed URL for that file. When you call generate_image,
-  pika_*, or any external tool that needs the actual image (e.g. for a
-  character likeness reference), pass that EXACT url through — do NOT
+  or any external tool that needs the actual image (e.g. for a character
+  likeness reference), pass that EXACT url through — do NOT
   invent a URL from the asset id, do NOT use the bare [ast_xxx] token, and
   do NOT skip the reference just because direct fetches failed once. If a
   tool says it can't reach the link, retry with the same url before
   falling back to a text-only description.
-- When the user approves the storyboard (or asks for keyframes), call
+- When the user approves the storyboard (or asks for shot images), call
   generate_image once per scene with a vivid prompt that bakes in the
   logline + scene.prompt + character description + a consistent style note.
   Then commit_project_patch to set each scene.thumb to the returned asset
   URL and scene.status = "ready".
-- Video clip rendering is handled by the "Go to production" button in the
-  Project panel — that runs a deterministic server pipeline, not chat.
-  You may still call pika_* tools when the user asks in conversation for
-  a one-off scene render or revision.
+- Animating shots, generating music, generating voiceover, and stitching the
+  final MP4 are handled by the "Render final video" button in the Project
+  panel — it runs a deterministic fal.ai pipeline, not chat. You do not need
+  to (and cannot) call video, music, or stitch tools from chat.
 
 Rules for patches:
 - Use "scenes" / "cast" to REPLACE the full list. Use "scenesAppend" / "castAppend" to add to it.
@@ -476,31 +476,12 @@ message. The card is the user-facing response; tool results alone are not.
   <script data-project-patch> block). Prefer this when you are also calling
   another tool in the same turn — keeps state updates atomic.
 
-- pika_* tools (only present when the workspace has connected Pika)
-  Use these to GENERATE ACTUAL VIDEO CLIPS via Pika. Call them when the
-  user has approved a scene/prompt and you're ready to produce moving
-  footage. The returned video URL is auto-attached to project state — do
-  NOT also list it in assetsAppend, just reference its asset id. If no
-  pika_* tool is available, you cannot render video yet — tell the user
-  to connect Pika via the "Connect Pika" pill in the header.
-
 Etiquette: at most 3 tool calls per turn. Tool-generated assets are already
 in project state — do NOT also list them in assetsAppend, just reference
 them by id.
 `;
 
 type ChatRequestBody = { messages?: unknown; projectId?: unknown };
-
-const SAFE_PIKA_TOOL_NAMES = new Set([
-  "upload_asset",
-  "generate_image",
-  "generate_video",
-  "generate_reference_video",
-  "generate_keyframes_video",
-  "task_status",
-  "task_cancel",
-  "analyze_media",
-]);
 
 function extractPatchFromText(text: string): unknown | null {
   const m = text.match(
