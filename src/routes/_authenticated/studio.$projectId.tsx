@@ -834,10 +834,10 @@ function ChatPanel({
     const html = textOf(m);
     const next = messages[i + 1];
     if (next && next.role === "user") {
-      const prose =
-        extractCardProse(html) || extractCardTitle(html);
-      if (prose) {
-        history.push({ kind: "assistant", key: `a-${m.id}`, text: prose });
+      const hasMedia = !!(extractProjectPatch(html) as { assetsAppend?: unknown[] } | null)?.assetsAppend?.length;
+      const prose = extractCardProse(html) || extractCardTitle(html);
+      if (prose || hasMedia) {
+        history.push({ kind: "assistant", key: `a-${m.id}`, text: html });
       }
       history.push({
         kind: "pill",
