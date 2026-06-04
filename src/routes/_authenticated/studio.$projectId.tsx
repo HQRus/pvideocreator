@@ -1296,7 +1296,9 @@ function StructurePanel({
               "Your video's overview will appear here and evolve as you make decisions in the chat."}
           </p>
           <TechSpecs meta={meta} totalDuration={totalDuration} sceneCount={scenes.length} />
-          {assets.length > 0 && <AssetsStrip assets={assets} />}
+          {assets.filter((a) => a.kind !== "keyframe").length > 0 && (
+            <AssetsStrip assets={assets.filter((a) => a.kind !== "keyframe")} />
+          )}
         </div>
         <div className="mt-6 border-b-2 border-border/40 px-6 pb-0">
           <TabsList className="h-auto w-full justify-between gap-2 rounded-none bg-transparent p-0">
