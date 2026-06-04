@@ -696,9 +696,35 @@ export function UserBubble({
 }
 
 export function AssistantMessage({ text }: { text: string }) {
+  const patch = extractProjectPatch(text) as
+    | { assetsAppend?: Array<{ url?: string; mime?: string; name?: string; label?: string }> }
+    | null;
+  const asset = patch?.assetsAppend?.[0];
+  const url = asset?.url;
+  const mime = asset?.mime ?? "";
+  const prose = extractCardProse(text) || extractCardTitle(text) || (url ? "" : text);
   return (
-    <div className="max-w-[85%] animate-fade-in self-start font-display text-2xl leading-snug tracking-tight text-foreground">
-      {text}
+    <div className="flex max-w-[85%] animate-fade-in flex-col gap-3 self-start">
+      {prose && (
+        <div className="font-display text-2xl leading-snug tracking-tight text-foreground">
+          {prose}
+        </div>
+      )}
+      {url && (
+        <div className="overflow-hidden rounded-2xl bg-muted shadow-elegant">
+          {mime.startsWith("video/") ? (
+            <video src={url} controls className="block max-h-[480px] w-full" />
+          ) : mime.startsWith("audio/") ? (
+            <audio src={url} controls className="w-full" />
+          ) : (
+            <img
+              src={url}
+              alt={asset?.label ?? asset?.name ?? "Generated media"}
+              className="block max-h-[480px] w-full object-contain"
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
