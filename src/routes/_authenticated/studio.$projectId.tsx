@@ -605,16 +605,22 @@ function ChatPanel({
   initialMessages,
   onPatch,
   assets,
+  studioMode,
+  studioModel,
+  onToolbarChange,
   registerSender,
 }: {
   projectId: string;
   initialMessages: UIMessage[];
   onPatch: (patch: ProjectPatch) => void;
   assets: ProjectAsset[];
+  studioMode: StudioMode;
+  studioModel: string | null;
+  onToolbarChange: (next: { mode: StudioMode; model: string | null }) => void;
   registerSender?: (fn: (text: string) => void) => void;
 }) {
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, setMessages, status, error } = useChat({
     id: projectId,
     messages: initialMessages,
     generateId: () =>
@@ -628,13 +634,59 @@ function ChatPanel({
     }),
   });
 
-  const busy = status === "submitted" || status === "streaming";
+  const runDirect = useServerFn(directGenerate);
+  const [directBusy, setDirectBusy] = useState(false);
+  const busy = status === "submitted" || status === "streaming" || directBusy;
 
   const handleSend = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput("");
-    await sendMessage({ text: trimmed });
+    if (studioMode === "agent") {
+      await sendMessage({ text: trimmed });
+      return;
+    }
+    // Non-agent: skip the chat agent; call the matching Fal model directly.
+    const model = studioModel ?? DEFAULT_MODEL_BY_KIND[studioMode];
+    const userId = crypto.randomUUID();
+    const assistantId = crypto.randomUUID();
+    setMessages((prev) => [
+      ...prev,
+      { id: userId, role: "user", parts: [{ type: "text", text: trimmed }] } as UIMessage,
+    ]);
+    setDirectBusy(true);
+    try {
+      const res = await runDirect({
+        data: {
+          projectId,
+          prompt: trimmed,
+          mode: studioMode,
+          model,
+          userMessageId: userId,
+          assistantMessageId: assistantId,
+        },
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          parts: [{ type: "text", text: res.assistantText }],
+        } as UIMessage,
+      ]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          parts: [{ type: "text", text: `Generation failed — ${msg}` }],
+        } as UIMessage,
+      ]);
+    } finally {
+      setDirectBusy(false);
+    }
   };
 
   // Expose our sender to the parent so the right-hand panel buttons can
