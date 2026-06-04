@@ -189,7 +189,7 @@ export const SKILLS: Skill[] = [
     description: "Dreamy, filmic clips you can drop into edits, intros, or mood reels.",
     category: "Video Apps",
     kind: "video",
-    model: "fal-ai/luma-dream-machine",
+    model: "fal-ai/luma-dream-machine/ray-2",
     icon: FilmIcon,
   },
   {
@@ -236,7 +236,7 @@ export const SKILLS: Skill[] = [
     description: "Tension-building cinematic score — risers, hits, and orchestral swells.",
     category: "Audio Apps",
     kind: "audio",
-    model: "fal-ai/stable-audio",
+    model: "fal-ai/stable-audio-25/text-to-audio",
     icon: Disc3Icon,
   },
   {
@@ -245,7 +245,7 @@ export const SKILLS: Skill[] = [
     description: "Custom one-shot SFX — whooshes, impacts, ambiences — tailored to your scene.",
     category: "Audio Apps",
     kind: "audio",
-    model: "fal-ai/stable-audio",
+    model: "fal-ai/stable-audio-25/text-to-audio",
     icon: ZapIcon,
   },
 
@@ -350,7 +350,7 @@ export const SKILLS: Skill[] = [
     description: "Cinematic, dreamy motion. Great for vibes and montages.",
     category: "Video",
     kind: "video",
-    model: "fal-ai/luma-dream-machine",
+    model: "fal-ai/luma-dream-machine/ray-2",
     icon: VideoIcon,
   },
   {
@@ -379,7 +379,7 @@ export const SKILLS: Skill[] = [
     description: "High-quality original music and SFX.",
     category: "Music",
     kind: "audio",
-    model: "fal-ai/stable-audio",
+    model: "fal-ai/stable-audio-25/text-to-audio",
     icon: MusicIcon,
   },
 
