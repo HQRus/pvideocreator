@@ -1466,6 +1466,15 @@ function StructurePanel({
             assets={assets}
           />
         </TabsContent>
+
+        <TabsContent value="renders" className="m-0 flex-1 overflow-y-auto px-8 pt-8 pb-40">
+          <RendersPanel
+            projectId={projectId}
+            activeJobId={renderJobId}
+            onRetry={onRenderFinal}
+            isRendering={rendering}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Floating sticky action bar */}
