@@ -1061,7 +1061,63 @@ function StructurePanel({
 }) {
   const [renderMsg, setRenderMsg] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
+  const [renderJobId, setRenderJobId] = useState<string | null>(null);
   const runFinal = useServerFn(renderFinalVideo);
+
+  // While a render job is active: subscribe to its row and tick the
+  // background pipeline every few seconds (belt-and-suspenders with the
+  // pg_cron-driven server-side tick).
+  useEffect(() => {
+    if (!renderJobId) return;
+    let cancelled = false;
+
+    const ping = () => {
+      void fetch("/api/public/render-tick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      }).catch(() => {});
+    };
+    ping();
+    const interval = window.setInterval(ping, 6_000);
+
+    const channel = supabase
+      .channel(`render-job-${renderJobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "render_jobs",
+          filter: `id=eq.${renderJobId}`,
+        },
+        (payload) => {
+          if (cancelled) return;
+          const row = payload.new as { status?: string; error?: string | null };
+          if (row.status === "done") {
+            setRenderMsg(
+              row.error
+                ? `Final video ready — ${row.error}.`
+                : "Final video ready.",
+            );
+            setRendering(false);
+            setRenderJobId(null);
+          } else if (row.status === "failed") {
+            setRenderMsg(`Render failed: ${row.error ?? "unknown error"}`);
+            setRendering(false);
+            setRenderJobId(null);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
+  }, [renderJobId]);
+
   const missingShotImages = scenes.filter((s) => !s.thumb).length;
   const missingClips = scenes.filter((s) => !s.clipUrl).length;
   const onGenerateShotImages = () => {
@@ -1098,19 +1154,13 @@ function StructurePanel({
     );
     try {
       const res = await runFinal({ data: { projectId } });
-      if (res.status === "done") {
-        setRenderMsg(
-          `Final video ready${res.failed ? ` — ${res.failed} step(s) failed but film is complete.` : "."}`,
-        );
-      } else {
-        setRenderMsg(
-          `Final stitch skipped — ${res.failed} step(s) failed. Retry from the affected shot(s).`,
-        );
-      }
+      // Kickoff returns immediately; a background tick pipeline (pg_cron +
+      // client poll below) advances the job. We watch render_jobs via
+      // Realtime to flip the message to done/failed.
+      setRenderJobId(res.renderJobId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setRenderMsg(`Render failed: ${msg}`);
-    } finally {
       setRendering(false);
     }
   };
