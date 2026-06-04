@@ -175,3 +175,21 @@
   }
   .animate-pill-land { animation: pill-land 0.3s ease-out 0.35s both; }
 }
+
+/* Restore hand cursor for interactive elements (Tailwind v4 / modern browsers default to arrow on <button>) */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  summary,
+  label[for],
+  a[href] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
