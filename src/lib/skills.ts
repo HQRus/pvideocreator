@@ -198,7 +198,7 @@ export const SKILLS: Skill[] = [
     description: "Short, punchy text-to-video clips perfect for stitching together a music video.",
     category: "Video Apps",
     kind: "video",
-    model: "fal-ai/kling-video/v2.1/standard/text-to-video",
+    model: "fal-ai/kling-video/v2.1/master/text-to-video",
     icon: ClapperboardIcon,
   },
   {
@@ -341,7 +341,7 @@ export const SKILLS: Skill[] = [
     description: "Generate a short clip from a written description.",
     category: "Video",
     kind: "video",
-    model: "fal-ai/kling-video/v2.1/standard/text-to-video",
+    model: "fal-ai/kling-video/v2.1/master/text-to-video",
     icon: VideoIcon,
   },
   {
@@ -421,7 +421,7 @@ export const SKILLS_BY_KIND = (kind: SkillKind): Skill[] =>
 
 export const DEFAULT_MODEL_BY_KIND: Record<SkillKind, string> = {
   image: "fal-ai/nano-banana",
-  video: "fal-ai/kling-video/v2.1/standard/text-to-video",
+  video: "fal-ai/kling-video/v2.1/master/text-to-video",
   audio: "fal-ai/cassetteai/music-generator",
   speech: "fal-ai/elevenlabs/tts/multilingual-v2",
 };
