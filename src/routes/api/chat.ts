@@ -571,6 +571,7 @@ export const Route = createFileRoute("/api/chat")({
                   "likeness",
                   "logo",
                   "reference",
+                  "keyframe",
                   "voice",
                   "audio",
                   "video",
