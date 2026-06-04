@@ -612,44 +612,34 @@ export const Route = createFileRoute("/api/chat")({
                 const promptWithRefs = resolvedReferenceUrls.length
                   ? `${prompt}\n\nIMPORTANT: Match the exact likeness, face, hair, skin tone, and identifying features from the provided reference image(s). Keep this person clearly recognizable.`
                   : prompt;
-                const { b64, mime } = await gatewayGenerateImage(
-                  promptWithRefs,
-                  key,
-                  resolvedReferenceUrls,
-                );
-                const bytes = base64ToBytes(b64);
-                // Persist durably so the asset survives page reload.
+                const sourceUrl = await falGenerateImage({
+                  prompt: promptWithRefs,
+                  aspect: projectState.meta.aspectRatio || "16:9",
+                  referenceImageUrls: resolvedReferenceUrls.filter((u) =>
+                    /^https?:/.test(u),
+                  ),
+                });
                 try {
-                  const stored = await storeAsset({
+                  const stored = await downloadAndStoreUrl({
                     projectId,
                     userId,
+                    sourceUrl,
                     kind: kind ?? "reference",
-                    mime,
-                    bytes,
                     label,
-                    name: (label ?? prompt.slice(0, 40)) + ".png",
+                    fallbackMime: "image/png",
                   });
                   return {
                     id: stored.id,
                     kind: kind ?? "reference",
-                    mime,
+                    mime: stored.mime,
                     name: (label ?? prompt.slice(0, 40)) + ".png",
                     url: stored.url,
                     label,
                   };
                 } catch (e) {
-                  // Fall back to in-memory cache so the current turn still
-                  // works even if storage upload fails.
-                  console.error("[chat] storeAsset failed, falling back:", e);
-                  const id = nextToolAssetId();
-                  putAsset(id, mime, bytes);
+                  console.error("[chat] downloadAndStoreUrl failed:", e);
                   return {
-                    id,
-                    kind: kind ?? "reference",
-                    mime,
-                    name: (label ?? prompt.slice(0, 40)) + ".png",
-                    url: `/api/asset/${id}`,
-                    label,
+                    error: e instanceof Error ? e.message : String(e),
                   };
                 }
               } catch (err) {
