@@ -1518,7 +1518,7 @@ const StructurePanel = memo(function StructurePanel({
       </div>
     </div>
   );
-}
+});
 
 function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
   return (
