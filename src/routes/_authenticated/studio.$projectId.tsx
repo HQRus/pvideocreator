@@ -734,42 +734,6 @@ function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, activeCard?.key, busy]);
 
-  // Collect every Pika MCP tool call across the whole conversation so the
-  // user can verify what actually ran (vs. the model just narrating).
-  const pikaCalls: Array<{
-    key: string;
-    name: string;
-    state: string;
-    input: unknown;
-    output: unknown;
-    videoCount: number;
-    errorText: string | null;
-  }> = [];
-  for (const m of messages) {
-    if (m.role !== "assistant") continue;
-    for (const p of toolPartsOf(m)) {
-      if (!p.type.startsWith("tool-pika_")) continue;
-      const out = p.output as { error?: unknown } | undefined;
-      const videos = p.state === "output-available" ? extractVideoAssets(out) : [];
-      let errorText: string | null = null;
-      if (p.state === "output-error") errorText = "Tool errored.";
-      else if (out && typeof out === "object" && "error" in out && out.error) {
-        errorText = typeof out.error === "string" ? out.error : JSON.stringify(out.error);
-      } else if (p.state === "output-available" && videos.length === 0) {
-        errorText = "Returned no video URL.";
-      }
-      pikaCalls.push({
-        key: `${m.id}-${p.toolCallId ?? p.type}`,
-        name: p.type.replace(/^tool-/, ""),
-        state: p.state ?? "unknown",
-        input: p.input,
-        output: p.output,
-        videoCount: videos.length,
-        errorText,
-      });
-    }
-  }
-
   return (
     <div className="relative flex h-full flex-col">
       <Conversation className="flex-1">
@@ -778,18 +742,6 @@ function ChatPanel({
             <BrandMark className="h-12 w-12" />
             <AssistantMessage text="What are we making? Type one word below — I'll take it from there." />
           </div>
-          {pikaCalls.length > 0 &&
-            typeof window !== "undefined" &&
-            window.localStorage?.getItem("avd:dev") === "1" && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card/50 p-3">
-              <div className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Pika render activity
-              </div>
-              {pikaCalls.map((c) => (
-                <PikaCallChip key={c.key} call={c} />
-              ))}
-            </div>
-          )}
           {history.map((it) =>
             it.kind === "user" ? (
               <UserBubble key={it.key} text={it.text} assets={assets} />
