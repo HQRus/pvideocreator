@@ -1563,6 +1563,7 @@ function EmptyHint({ icon, text }: { icon: ReactNode; text: string }) {
 
 const GENERATION_KINDS = new Set([
   "image",
+  "reference",
   "video",
   "audio",
   "music",
